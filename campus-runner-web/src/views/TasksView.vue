@@ -6,6 +6,25 @@
       <div></div>
     </div>
     
+    <!-- 搜索框 -->
+    <div class="search-bar">
+      <el-input
+        v-model="searchKeyword"
+        placeholder="搜索任务标题、描述或地址..."
+        clearable
+        @clear="handleSearch"
+        @keyup.enter="handleSearch"
+        style="width: 400px"
+      >
+        <template #prefix>
+          <el-icon><Search /></el-icon>
+        </template>
+        <template #append>
+          <el-button @click="handleSearch">搜索</el-button>
+        </template>
+      </el-input>
+    </div>
+    
     <div class="filter-bar">
       <el-select v-model="filter.categoryId" placeholder="任务分类" clearable>
         <el-option
@@ -25,9 +44,18 @@
     </div>
     
     <div class="task-list" v-loading="loading">
-      <el-card v-for="task in tasks" :key="task.id" class="task-card" @click="goDetail(task.id)">
+      <el-card 
+        v-for="task in tasks" 
+        :key="task.id" 
+        class="task-card" 
+        :class="{ 'my-task': isMyTask(task.publisherId) }"
+        @click="goDetail(task.id)"
+      >
         <div class="task-header">
-          <el-tag size="small">{{ getCategoryName(task.categoryId) }}</el-tag>
+          <div class="header-left">
+            <el-tag size="small">{{ getCategoryName(task.categoryId) }}</el-tag>
+            <el-tag v-if="isMyTask(task.publisherId)" type="primary" size="small" class="my-tag">我的</el-tag>
+          </div>
           <span class="reward">¥{{ task.reward }}</span>
         </div>
         <h4 class="task-title">{{ task.title }}</h4>
@@ -37,7 +65,7 @@
         </p>
         <div class="task-footer">
           <span class="time">{{ formatTime(task.createTime) }}</span>
-          <el-tag :type="getStatusType(task.status)" size="small">{{ getStatusText(task.status) }}</el-tag>
+          <el-tag :type="getStatusType(task.status)" size="small">{{ getTaskProgressText(task) }}</el-tag>
         </div>
       </el-card>
     </div>
@@ -55,16 +83,19 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Location } from '@element-plus/icons-vue'
+import { ArrowLeft, Location, Search } from '@element-plus/icons-vue'
 import { getTaskList, getCategoryList } from '@/api/task'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 const loading = ref(false)
 const tasks = ref<any[]>([])
 const categories = ref<any[]>([])
 const total = ref(0)
 const pageNum = ref(1)
 const pageSize = ref(10)
+const searchKeyword = ref('')
 
 const filter = ref({
   categoryId: '',
@@ -93,7 +124,8 @@ const loadTasks = async () => {
       pageSize: pageSize.value,
       categoryId: filter.value.categoryId || undefined,
       sortBy: filter.value.sortBy,
-      sortOrder: 'desc'
+      sortOrder: 'desc',
+      keyword: searchKeyword.value || undefined
     })
     tasks.value = res.result.records || res.result.list || []
     total.value = res.result.total || 0
@@ -102,6 +134,17 @@ const loadTasks = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// 搜索处理
+const handleSearch = () => {
+  pageNum.value = 1 // 重置到第一页
+  loadTasks()
+}
+
+// 判断是否是自己发布的任务
+const isMyTask = (publisherId: string) => {
+  return userStore.userInfo?.id === publisherId
 }
 
 const getCategoryName = (id: string) => {
@@ -117,6 +160,16 @@ const getStatusType = (status: number) => {
 const getStatusText = (status: number) => {
   const texts: Record<number, string> = { 0: '待接单', 1: '进行中', 2: '已完成', 3: '已取消' }
   return texts[status] || '未知'
+}
+
+// 获取任务进度文本
+const getTaskProgressText = (task: any) => {
+  if (task.status === 0) return '待接取'
+  if (task.status === 1 && !task.pickupTime) return '已接取'
+  if (task.status === 1 && task.pickupTime) return '已取件'
+  if (task.status === 2) return '已完成'
+  if (task.status === 3) return '已取消'
+  return '未知'
 }
 
 const formatTime = (time: string) => {
@@ -142,6 +195,12 @@ const goDetail = (id: string) => {
   margin-bottom: 20px;
 }
 
+.search-bar {
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: center;
+}
+
 .filter-bar {
   display: flex;
   gap: 16px;
@@ -158,9 +217,16 @@ const goDetail = (id: string) => {
 .task-card {
   cursor: pointer;
   transition: transform 0.2s;
+  position: relative;
   
   &:hover {
     transform: translateY(-2px);
+  }
+  
+  // 自己发布的任务样式
+  &.my-task {
+    border-left: 4px solid #409eff;
+    background: linear-gradient(135deg, #f0f7ff 0%, #ffffff 100%);
   }
 }
 
@@ -169,6 +235,16 @@ const goDetail = (id: string) => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
+  
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    
+    .my-tag {
+      font-weight: 600;
+    }
+  }
 }
 
 .reward {

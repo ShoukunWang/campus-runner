@@ -35,9 +35,13 @@
           <span class="unit">元</span>
         </el-form-item>
         
-        <el-form-item label="物品重量">
-          <el-input-number v-model="form.weight" :min="0" :precision="2" />
-          <span class="unit">kg</span>
+        <el-form-item label="物品重量" prop="weightLevel">
+          <el-select v-model="form.weightLevel" placeholder="请选择物品重量等级">
+            <el-option label="🎒 小件 (0-2kg) - 文件、小包裹、零食等" value="small" />
+            <el-option label="📦 中件 (2-5kg) - 书本、中型包裹、日用品等" value="medium" />
+            <el-option label="📦 大件 (5-10kg) - 行李箱、大包裹、成箱物品等" value="large" />
+            <el-option label="🚚 超大件 (10kg+) - 家具、大型设备、批量物品等" value="extra_large" />
+          </el-select>
         </el-form-item>
         
         <el-form-item label="期望完成时间">
@@ -94,7 +98,7 @@ const form = ref({
   pickupAddress: '',
   deliveryAddress: '',
   reward: 5,
-  weight: 0,
+  weightLevel: '',
   expectCompleteTime: '',
   contactName: '',
   contactPhone: '',
@@ -142,8 +146,17 @@ const handlePublish = async () => {
     if (valid) {
       loading.value = true
       try {
+        // 将重量等级转换为具体重量值（取区间中值）
+        const weightMap: Record<string, number> = {
+          small: 1,        // 0-2kg，取1kg
+          medium: 3.5,     // 2-5kg，取3.5kg
+          large: 7.5,      // 5-10kg，取7.5kg
+          extra_large: 12  // 10kg+，取12kg
+        }
+        
         const submitData = {
           ...form.value,
+          weight: weightMap[form.value.weightLevel] || 1, // 默认1kg
           expectCompleteTime: formatDateTime(form.value.expectCompleteTime)
         }
         await publishTask(submitData)

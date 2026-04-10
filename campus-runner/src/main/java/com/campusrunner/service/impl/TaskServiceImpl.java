@@ -35,7 +35,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
 
     @Override
     public Page<Task> getTaskList(Integer pageNum, Integer pageSize, String categoryId, Integer taskType,
-                                 BigDecimal minReward, BigDecimal maxReward, String area, String sortField) {
+                                 BigDecimal minReward, BigDecimal maxReward, String area, String keyword, String sortField) {
         Page<Task> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Task> wrapper = new LambdaQueryWrapper<>();
         
@@ -56,6 +56,19 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         }
         if (StrUtil.isNotBlank(area)) {
             wrapper.and(w -> w.like(Task::getPickupAddress, area).or().like(Task::getDeliveryAddress, area));
+        }
+        
+        // 关键词搜索：标题、描述、地址
+        if (StrUtil.isNotBlank(keyword)) {
+            wrapper.and(w -> w
+                .like(Task::getTitle, keyword)
+                .or()
+                .like(Task::getDescription, keyword)
+                .or()
+                .like(Task::getPickupAddress, keyword)
+                .or()
+                .like(Task::getDeliveryAddress, keyword)
+            );
         }
         
         if ("rewardAsc".equals(sortField)) {
@@ -165,11 +178,16 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
                 if (task.getStatus() != 1) {
                     throw new RuntimeException("当前状态不允许取件");
                 }
+                task.setPickupTime(now);
                 break;
             case "deliver":
                 if (task.getStatus() != 1) {
                     throw new RuntimeException("当前状态不允许送达");
                 }
+                if (task.getPickupTime() == null) {
+                    throw new RuntimeException("请先确认取件");
+                }
+                task.setDeliverTime(now);
                 task.setStatus(2);
                 task.setCompleteTime(now);
                 break;

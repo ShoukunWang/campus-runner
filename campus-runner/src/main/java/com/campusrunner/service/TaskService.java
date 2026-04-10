@@ -11,7 +11,7 @@ import java.util.Map;
 public interface TaskService extends IService<Task> {
 
     Page<Task> getTaskList(Integer pageNum, Integer pageSize, String categoryId, Integer taskType,
-                          BigDecimal minReward, BigDecimal maxReward, String area, String sortField);
+                          BigDecimal minReward, BigDecimal maxReward, String area, String keyword, String sortField);
 
     Task getTaskDetail(String taskId);
 

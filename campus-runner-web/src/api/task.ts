@@ -13,6 +13,7 @@ export const getTaskList = (params: {
   status?: number
   sortBy?: string
   sortOrder?: string
+  keyword?: string
 }) => {
   return request.get('/task/list', { params })
 }

@@ -51,7 +51,7 @@
             <el-icon><HomeFilled /></el-icon>
             <template #title>任务大厅</template>
           </el-menu-item>
-          <el-menu-item index="/publish">
+          <el-menu-item index="/publish" v-if="userStore.currentRole === 'publisher'">
             <el-icon><Plus /></el-icon>
             <template #title>发布任务</template>
           </el-menu-item>
@@ -102,6 +102,13 @@
           <h3 class="page-title">{{ $route.meta.title || '校园跑腿' }}</h3>
         </div>
         <div class="header-right">
+          <div class="role-switch" @click="toggleRole" :title="userStore.currentRole === 'publisher' ? '切换到跑腿者' : '切换到发布者'">
+            <el-icon :size="20">
+              <UserFilled v-if="userStore.currentRole === 'publisher'" />
+              <Van v-else />
+            </el-icon>
+            <span class="role-text">{{ userStore.currentRole === 'publisher' ? '发布者' : '跑腿者' }}</span>
+          </div>
           <el-dropdown @command="handleCommand">
             <div class="user-info">
               <el-avatar :size="32" :src="userStore.userInfo?.avatar || defaultAvatar" />
@@ -153,7 +160,9 @@ import {
   ArrowDown,
   SwitchButton,
   Box,
-  DataLine
+  DataLine,
+  UserFilled,
+  Van
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 
@@ -186,9 +195,15 @@ const isAdmin = computed(() => {
 })
 
 // 菜单主题色
-const menuBgColor = computed(() => isAdminRoute.value ? '#1a1a2e' : '#304156')
+const menuBgColor = computed(() => {
+  if (isAdminRoute.value) return '#1a1a2e'
+  return userStore.currentRole === 'publisher' ? '#304156' : '#4a3728'
+})
 const menuTextColor = computed(() => '#bfcbd9')
-const menuActiveColor = computed(() => isAdminRoute.value ? '#e6a23c' : '#409eff')
+const menuActiveColor = computed(() => {
+  if (isAdminRoute.value) return '#e6a23c'
+  return userStore.currentRole === 'publisher' ? '#409eff' : '#e6a23c'
+})
 
 // 当前激活的菜单
 const activeMenu = computed(() => route.path)
@@ -196,6 +211,18 @@ const activeMenu = computed(() => route.path)
 // 切换侧边栏折叠
 const toggleCollapse = () => {
   isCollapse.value = !isCollapse.value
+}
+
+// 切换身份角色
+const toggleRole = () => {
+  const newRole = userStore.currentRole === 'publisher' ? 'runner' : 'publisher'
+  userStore.switchRole(newRole)
+  ElMessage.success(`已切换到${newRole === 'publisher' ? '发布者' : '跑腿者'}模式`)
+  
+  // 如果当前在发布任务页面且切换到跑腿者,跳转到任务大厅
+  if (route.path === '/publish' && newRole === 'runner') {
+    router.push('/tasks')
+  }
 }
 
 // 处理下拉菜单命令
@@ -351,6 +378,28 @@ const handleLogout = async () => {
   .header-right {
     display: flex;
     align-items: center;
+
+    .role-switch {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      padding: 8px 12px;
+      border-radius: 20px;
+      margin-right: 16px;
+      transition: all 0.3s;
+      background-color: v-bind(menuActiveColor);
+      color: #fff;
+
+      &:hover {
+        opacity: 0.8;
+      }
+
+      .role-text {
+        margin-left: 6px;
+        font-size: 14px;
+        font-weight: 500;
+      }
+    }
 
     .user-info {
       display: flex;

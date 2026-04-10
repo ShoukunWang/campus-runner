@@ -63,16 +63,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 
 import { getMyTasks } from '@/api/task'
 import TaskList from '@/components/TaskList.vue'
+import { useUserStore } from '@/stores/user'
 
+const userStore = useUserStore()
 const MY_TASKS_TAB_KEY = 'my-tasks-active-tab'
+
+// 根据身份确定默认标签页
+const getDefaultTab = () => {
+  return userStore.currentRole === 'publisher' ? 'published' : 'accepted'
+}
 
 // 从 sessionStorage 恢复标签页状态
 const savedTab = sessionStorage.getItem(MY_TASKS_TAB_KEY)
-const activeTab = ref(savedTab || 'published')
+const activeTab = ref(savedTab || getDefaultTab())
 const loading = ref(false)
 const publishedTasks = ref<any[]>([])
 const acceptedTasks = ref<any[]>([])
@@ -179,6 +186,18 @@ const handleTabChange = (tabName: string) => {
   sessionStorage.setItem(MY_TASKS_TAB_KEY, tabName)
   loadTasks()
 }
+
+// 当身份切换时,如果没有手动选择过标签页,自动切换
+watch(() => userStore.currentRole, (newRole) => {
+  const hasManualSelection = sessionStorage.getItem(MY_TASKS_TAB_KEY)
+  if (!hasManualSelection) {
+    activeTab.value = newRole === 'publisher' ? 'published' : 'accepted'
+  } else {
+    // 如果有手动选择,清除sessionStorage,让身份切换生效
+    sessionStorage.removeItem(MY_TASKS_TAB_KEY)
+    activeTab.value = newRole === 'publisher' ? 'published' : 'accepted'
+  }
+})
 </script>
 
 <style scoped lang="scss">

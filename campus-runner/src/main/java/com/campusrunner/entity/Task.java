@@ -55,6 +55,10 @@ public class Task {
 
     private LocalDateTime acceptTime;
 
+    private LocalDateTime pickupTime;
+
+    private LocalDateTime deliverTime;
+
     private LocalDateTime completeTime;
 
     private String cancelReason;

@@ -28,8 +28,9 @@ public class TaskController {
             @RequestParam(required = false) BigDecimal minReward,
             @RequestParam(required = false) BigDecimal maxReward,
             @RequestParam(required = false) String area,
+            @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "createTime") String sortField) {
-        Page<Task> page = taskService.getTaskList(pageNum, pageSize, categoryId, taskType, minReward, maxReward, area, sortField);
+        Page<Task> page = taskService.getTaskList(pageNum, pageSize, categoryId, taskType, minReward, maxReward, area, keyword, sortField);
         return Result.success(page);
     }
 

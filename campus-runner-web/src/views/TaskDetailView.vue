@@ -24,11 +24,21 @@
           <el-descriptions-item label="任务分类">{{ task.categoryName }}</el-descriptions-item>
           <el-descriptions-item label="取件地址">{{ task.pickupAddress }}</el-descriptions-item>
           <el-descriptions-item label="送达地址">{{ task.deliveryAddress }}</el-descriptions-item>
-          <el-descriptions-item label="物品重量">{{ task.weight || 0 }} kg</el-descriptions-item>
+          <el-descriptions-item label="物品重量">{{ getWeightLevel(task.weight) }}</el-descriptions-item>
           <el-descriptions-item label="期望完成时间">{{ task.expectCompleteTime }}</el-descriptions-item>
           <el-descriptions-item label="联系人">{{ task.contactName }} {{ task.contactPhone }}</el-descriptions-item>
           <el-descriptions-item label="任务描述">{{ task.description || '暂无描述' }}</el-descriptions-item>
         </el-descriptions>
+
+        <!-- 任务进度条 -->
+        <div class="task-progress" v-if="task.status !== 3">
+          <el-steps :active="getCurrentStep()" align-center>
+            <el-step title="待接取" description="等待跑腿员接单" />
+            <el-step title="已接取" description="跑腿员已接单" />
+            <el-step title="已取件" description="跑腿员已取件" />
+            <el-step title="已完成" description="任务已完成" />
+          </el-steps>
+        </div>
 
         <div class="actions">
           <!-- 发布者视角 -->
@@ -96,22 +106,29 @@
               {{ task.status === 3 ? '重新接单' : '立即接单' }}
             </el-button>
 
-            <!-- 进行中状态：显示取件、完成和取消按钮 -->
+            <!-- 进行中状态：根据取件状态显示不同按钮 -->
             <template v-if="task.status === 1">
+              <!-- 未取件：显示确认取件按钮 -->
               <el-button
+                v-if="!task.pickupTime"
                 type="warning"
                 size="large"
                 @click="handlePickup"
               >
                 确认取件
               </el-button>
+              
+              <!-- 已取件：显示确认送达按钮 -->
               <el-button
+                v-if="task.pickupTime"
                 type="success"
                 size="large"
                 @click="handleDeliver"
               >
                 确认送达
               </el-button>
+              
+              <!-- 取消按钮始终显示 -->
               <el-button
                 type="danger"
                 size="large"
@@ -241,8 +258,13 @@
         <el-form-item label="酬金">
           <el-input-number v-model="editForm.reward" :min="1" :precision="2" style="width: 200px" />
         </el-form-item>
-        <el-form-item label="物品重量(kg)">
-          <el-input-number v-model="editForm.weight" :min="0" :precision="2" style="width: 200px" />
+        <el-form-item label="物品重量">
+          <el-select v-model="editForm.weightLevel" placeholder="请选择物品重量等级" style="width: 100%">
+            <el-option label="🎒 小件 (0-2kg) - 文件、小包裹、零食等" value="small" />
+            <el-option label="📦 中件 (2-5kg) - 书本、中型包裹、日用品等" value="medium" />
+            <el-option label="📦 大件 (5-10kg) - 行李箱、大包裹、成箱物品等" value="large" />
+            <el-option label="🚚 超大件 (10kg+) - 家具、大型设备、批量物品等" value="extra_large" />
+          </el-select>
         </el-form-item>
         <el-form-item label="联系人">
           <el-input v-model="editForm.contactName" placeholder="请输入联系人姓名" />
@@ -311,7 +333,7 @@ const editForm = ref({
   pickupAddress: '',
   deliveryAddress: '',
   reward: 0,
-  weight: 0,
+  weightLevel: '',
   contactName: '',
   contactPhone: '',
   expectCompleteTime: '',
@@ -529,6 +551,37 @@ const handleCancelPublish = async () => {
   }
 }
 
+// 重量等级转换
+const getWeightLevel = (weight: number) => {
+  if (!weight && weight !== 0) return '未指定'
+  if (weight <= 2) return '🎒 小件 (0-2kg)'
+  if (weight <= 5) return '📦 中件 (2-5kg)'
+  if (weight <= 10) return '📦 大件 (5-10kg)'
+  return '🚚 超大件 (10kg+)'
+}
+
+// 获取当前任务进度步骤
+const getCurrentStep = () => {
+  if (!task.value) return 0
+  // status=0: 待接取 (step 0)
+  if (task.value.status === 0) return 0
+  // status=1 且没有取件时间: 已接取 (step 1)
+  if (task.value.status === 1 && !task.value.pickupTime) return 1
+  // status=1 且有取件时间 或 status=2: 已取件/已完成 (step 2-3)
+  if (task.value.status === 1 && task.value.pickupTime) return 2
+  if (task.value.status === 2) return 3
+  return 0
+}
+
+// 重量数值转等级key
+const getWeightLevelKey = (weight: number) => {
+  if (!weight && weight !== 0) return ''
+  if (weight <= 2) return 'small'
+  if (weight <= 5) return 'medium'
+  if (weight <= 10) return 'large'
+  return 'extra_large'
+}
+
 // 修改任务（打开编辑对话框）
 const handleEditTask = async () => {
   // 加载分类列表
@@ -548,7 +601,7 @@ const handleEditTask = async () => {
     pickupAddress: task.value.pickupAddress || '',
     deliveryAddress: task.value.deliveryAddress || '',
     reward: task.value.reward || 0,
-    weight: task.value.weight || 0,
+    weightLevel: getWeightLevelKey(task.value.weight),
     contactName: task.value.contactName || '',
     contactPhone: task.value.contactPhone || '',
     expectCompleteTime: task.value.expectCompleteTime || '',
@@ -583,13 +636,21 @@ const handleSubmitEdit = async () => {
   
   editLoading.value = true
   try {
+    // 将重量等级转换为具体重量值
+    const weightMap: Record<string, number> = {
+      small: 1,
+      medium: 3.5,
+      large: 7.5,
+      extra_large: 12
+    }
+    
     await updateTask(task.value.id, {
       title: editForm.value.title,
       description: editForm.value.description,
       pickupAddress: editForm.value.pickupAddress,
       deliveryAddress: editForm.value.deliveryAddress,
       reward: editForm.value.reward,
-      weight: editForm.value.weight,
+      weight: weightMap[editForm.value.weightLevel] || 1,
       contactName: editForm.value.contactName,
       contactPhone: editForm.value.contactPhone,
       expectCompleteTime: formatDateTime(editForm.value.expectCompleteTime),
@@ -622,6 +683,23 @@ const handleSubmitEdit = async () => {
 
 .detail-card {
   padding: 20px;
+}
+
+.task-progress {
+  margin-top: 24px;
+  padding: 20px;
+  background: #f5f7fa;
+  border-radius: 8px;
+  
+  :deep(.el-step__title) {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  
+  :deep(.el-step__description) {
+    font-size: 12px;
+    color: #909399;
+  }
 }
 
 .detail-header {

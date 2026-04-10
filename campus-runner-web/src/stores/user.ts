@@ -18,6 +18,11 @@ export const useUserStore = defineStore('user', () => {
   const token = ref<string>(localStorage.getItem('token') || '')
   const userInfo = ref<UserInfo | null>(null)
   const isLoggedIn = computed(() => !!token.value)
+  
+  // 当前身份角色: publisher(发布者) | runner(跑腿者)
+  const currentRole = ref<'publisher' | 'runner'>(
+    (localStorage.getItem('currentRole') as 'publisher' | 'runner') || 'publisher'
+  )
 
   // Actions
   const setToken = (newToken: string) => {
@@ -43,14 +48,22 @@ export const useUserStore = defineStore('user', () => {
       userInfo.value = JSON.parse(stored)
     }
   }
+  
+  // 切换身份角色
+  const switchRole = (role: 'publisher' | 'runner') => {
+    currentRole.value = role
+    localStorage.setItem('currentRole', role)
+  }
 
   return {
     token,
     userInfo,
     isLoggedIn,
+    currentRole,
     setToken,
     setUserInfo,
     logout,
-    initUserInfo
+    initUserInfo,
+    switchRole
   }
 })
