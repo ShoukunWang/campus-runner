@@ -1,0 +1,27 @@
+# Java
+target/
+*.iml
+.idea/
+*.log
+
+# 前端
+node_modules/
+dist/
+.env
+.DS_Store
+
+# 其他
+*.jar
+*.war
+
+* text=auto
+*.ts text eol=lf
+*.vue text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+
+# 让idea/target不自动转换换行
+.idea/ binary
+target/ binary
