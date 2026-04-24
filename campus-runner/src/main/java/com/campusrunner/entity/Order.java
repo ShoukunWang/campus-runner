@@ -25,6 +25,14 @@ public class Order {
 
     private BigDecimal amount;
 
+    /**
+     * 订单状态：
+     * 0 - 待支付：等待发布者支付赏金
+     * 1 - 已支付：发布者已完成支付
+     * 2 - 退款中：发布者申请退款，待跑腿员审核
+     * 3 - 已退款：跑腿员已同意退款
+     * 4 - 支付逾期：超过7天未支付，已扣信用积分
+     */
     private Integer status;
 
     private LocalDateTime payTime;

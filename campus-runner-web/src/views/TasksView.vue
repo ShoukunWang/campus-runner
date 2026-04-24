@@ -153,22 +153,32 @@ const getCategoryName = (id: string) => {
 }
 
 const getStatusType = (status: number) => {
-  const types: Record<number, string> = { 0: 'info', 1: 'warning', 2: 'success', 3: 'danger', 4: 'warning' }
+  const types: Record<number, string> = { 0: 'info', 1: 'warning', 2: 'success', 3: 'danger', 4: 'warning', 5: 'primary' }
   return types[status] || 'info'
 }
 
 const getStatusText = (status: number) => {
-  const texts: Record<number, string> = { 0: '待接单', 1: '进行中', 2: '已完成', 3: '已取消', 4: '已退回' }
+  const texts: Record<number, string> = {
+    [-1]: '待发布',
+    0: '待接取',
+    1: '进行中',
+    2: '已提货',
+    3: '待确认',
+    4: '已完成',
+    5: '已取消',
+    6: '待接取'
+  }
   return texts[status] || '未知'
 }
 
 // 获取任务进度文本
 const getTaskProgressText = (task: any) => {
-  if (task.status === 0) return '待接取'
-  if (task.status === 1 && !task.pickupTime) return '已接取'
-  if (task.status === 1 && task.pickupTime) return '已取件'
-  if (task.status === 2) return '已完成'
-  if (task.status === 3) return '已取消'
+  if (task.status === 0 || task.status === 6) return '待接取'
+  if (task.status === 1) return '已接取'
+  if (task.status === 2) return '已提货'
+  if (task.status === 3) return '待确认'
+  if (task.status === 4) return '已完成'
+  if (task.status === 5) return '已取消'
   return '未知'
 }
 

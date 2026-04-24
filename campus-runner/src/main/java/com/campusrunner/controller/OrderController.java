@@ -67,17 +67,34 @@ public class OrderController {
     }
 
     /**
-     * 退款订单
+     * 发布者申请退款
      */
-    @PostMapping("/refund/{orderId}")
-    public Result<Order> refundOrder(@PathVariable String orderId, @RequestBody Map<String, Object> params, HttpServletRequest request) {
+    @PostMapping("/apply-refund/{orderId}")
+    public Result<Order> applyRefund(@PathVariable String orderId, @RequestBody Map<String, Object> params, HttpServletRequest request) {
         try {
             String userId = (String) request.getAttribute("userId");
             String reason = (String) params.get("reason");
-            Order order = orderService.refundOrder(orderId, userId, reason);
-            return Result.success("退款成功", order);
+            Order order = orderService.applyRefund(orderId, userId, reason);
+            return Result.success("已提交退款申请，请等待跑腿员审核", order);
         } catch (RuntimeException e) {
             return Result.error(7004, e.getMessage());
+        }
+    }
+
+    /**
+     * 跑腿员审核退款申请
+     */
+    @PostMapping("/audit-refund/{orderId}")
+    public Result<Order> auditRefund(@PathVariable String orderId, @RequestBody Map<String, Object> params, HttpServletRequest request) {
+        try {
+            String userId = (String) request.getAttribute("userId");
+            Boolean agreed = (Boolean) params.get("agreed");
+            String rejectReason = (String) params.get("rejectReason");
+            Order order = orderService.auditRefund(orderId, userId, agreed, rejectReason);
+            String msg = agreed ? "已同意退款" : "已拒绝退款";
+            return Result.success(msg, order);
+        } catch (RuntimeException e) {
+            return Result.error(7005, e.getMessage());
         }
     }
 
@@ -94,6 +111,18 @@ public class OrderController {
         String userId = (String) request.getAttribute("userId");
         Page<Order> page = orderService.getMyOrders(userId, status, pageNum, pageSize);
         return Result.success(page);
+    }
+
+    /**
+     * 查询订单详情
+     */
+    @GetMapping("/{orderId}")
+    public Result<Order> getOrderDetail(@PathVariable String orderId) {
+        Order order = orderService.getById(orderId);
+        if (order == null) {
+            return Result.error(7006, "订单不存在");
+        }
+        return Result.success(order);
     }
 
     /**

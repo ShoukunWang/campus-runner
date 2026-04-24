@@ -226,12 +226,14 @@ public class AdminServiceImpl extends ServiceImpl<AdminMapper, Admin> implements
         long totalUsers = userMapper.selectCount(null);
         long totalTasks = taskMapper.selectCount(null);
         long totalCompletedTasks = taskMapper.selectCount(
-                new LambdaQueryWrapper<Task>().eq(Task::getStatus, 2));
+                new LambdaQueryWrapper<Task>().eq(Task::getStatus, 4));
         long totalPendingTasks = taskMapper.selectCount(
                 new LambdaQueryWrapper<Task>().eq(Task::getStatus, 0));
         long totalOngoingTasks = taskMapper.selectCount(
-                new LambdaQueryWrapper<Task>().eq(Task::getStatus, 1));
+                new LambdaQueryWrapper<Task>().and(w -> w.eq(Task::getStatus, 1).or().eq(Task::getStatus, 2)));
         long totalCancelledTasks = taskMapper.selectCount(
+                new LambdaQueryWrapper<Task>().and(w -> w.eq(Task::getStatus, 5).or().eq(Task::getStatus, 6)));
+        long totalConfirmingTasks = taskMapper.selectCount(
                 new LambdaQueryWrapper<Task>().eq(Task::getStatus, 3));
 
         // 计算总酬金
@@ -256,33 +258,31 @@ public class AdminServiceImpl extends ServiceImpl<AdminMapper, Admin> implements
 
         long todayCompletedTasks = taskMapper.selectCount(
                 new LambdaQueryWrapper<Task>()
-                        .eq(Task::getStatus, 2)
+                        .eq(Task::getStatus, 4)
                         .ge(Task::getCompleteTime, todayStart)
                         .lt(Task::getCompleteTime, todayEnd));
 
-        Map<String, Object> overview = new HashMap<>();
-        overview.put("totalUsers", totalUsers);
-        overview.put("totalTasks", totalTasks);
-        overview.put("totalCompletedTasks", totalCompletedTasks);
-        overview.put("totalPendingTasks", totalPendingTasks);
-        overview.put("totalOngoingTasks", totalOngoingTasks);
-        overview.put("totalCancelledTasks", totalCancelledTasks);
-        overview.put("totalReward", totalReward);
+        result.put("totalUsers", totalUsers);
+        result.put("totalTasks", totalTasks);
+        result.put("totalCompletedTasks", totalCompletedTasks);
+        result.put("totalPendingTasks", totalPendingTasks);
+        result.put("totalOngoingTasks", totalOngoingTasks);
+        result.put("totalCancelledTasks", totalCancelledTasks);
+        result.put("totalReward", totalReward);
+
+        // 前端期望的扁平键名
+        result.put("pendingTasks", totalPendingTasks);
+        result.put("runningTasks", totalOngoingTasks);
+        result.put("confirmingTasks", totalConfirmingTasks);
+        result.put("completedTasks", totalCompletedTasks);
+        result.put("cancelledTasks", totalCancelledTasks);
 
         Map<String, Object> todayStats = new HashMap<>();
         todayStats.put("newUsers", todayNewUsers);
         todayStats.put("newTasks", todayNewTasks);
         todayStats.put("completedTasks", todayCompletedTasks);
 
-        Map<String, Long> statusStats = new HashMap<>();
-        statusStats.put("pending", totalPendingTasks);
-        statusStats.put("ongoing", totalOngoingTasks);
-        statusStats.put("completed", totalCompletedTasks);
-        statusStats.put("cancelled", totalCancelledTasks);
-
-        result.put("overview", overview);
         result.put("today", todayStats);
-        result.put("taskStatusStats", statusStats);
 
         return result;
     }

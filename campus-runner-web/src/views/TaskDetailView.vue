@@ -43,7 +43,25 @@
         <div class="actions">
           <!-- 发布者视角 -->
           <template v-if="isPublisher">
-            <!-- 待接单状态：可以取消发布或修改任务 -->
+            <!-- 草稿/待发布状态：发布或继续修改 -->
+            <template v-if="task.status === -1 || task.status === 5">
+              <el-button
+                type="primary"
+                size="large"
+                @click="handlePublish"
+              >
+                发布任务
+              </el-button>
+              <el-button
+                type="warning"
+                size="large"
+                @click="handleEditTask"
+              >
+                修改任务
+              </el-button>
+            </template>
+
+            <!-- 待接取状态：取消发布回到草稿 或 修改任务 -->
             <template v-if="task.status === 0">
               <el-button
                 type="danger"
@@ -62,85 +80,113 @@
               </el-button>
             </template>
 
-            <!-- 进行中状态：只能查看，不能操作（由跑腿员操作） -->
+            <!-- 进行中状态：跑腿员已接单，等待处理 -->
             <template v-if="task.status === 1">
               <el-button
                 type="info"
                 size="large"
                 disabled
               >
-                任务进行中
+                已接单，待跑腿员提货
               </el-button>
             </template>
 
-            <!-- 已完成状态：支付赏金（如未支付）和评价 -->
+            <!-- 已提货状态：跑腿员配送中 -->
             <template v-if="task.status === 2">
               <el-button
-                v-if="!task.isPaid"
                 type="primary"
                 size="large"
-                @click="handlePay"
+                disabled
               >
-                支付赏金
+                跑腿员已提货，配送中
               </el-button>
+            </template>
+
+            <!-- 待确认状态：发布者确认收到物品 -->
+            <template v-if="task.status === 3">
               <el-button
-                v-if="!task.isReviewed"
                 type="success"
                 size="large"
-                @click="showReviewDialog = true"
+                @click="handleConfirmReceive"
               >
-                评价跑腿员
+                确认收到
+              </el-button>
+              <el-button
+                type="info"
+                size="large"
+                disabled
+              >
+                3天内未确认将自动完成
+              </el-button>
+            </template>
+
+            <!-- 已完成状态：跳转到订单处理支付和评价 -->
+            <template v-if="task.status === 4">
+              <el-button
+                type="primary"
+                size="large"
+                @click="goToOrderDetail"
+              >
+                查看订单
               </el-button>
             </template>
           </template>
 
           <!-- 跑腿员视角 -->
           <template v-if="isRunner">
-            <!-- 待接单或已退回状态：显示接单按钮 -->
+            <!-- 待接取或已退回状态：显示接单按钮 -->
             <el-button
-              v-if="task.status === 0 || task.status === 4"
+              v-if="task.status === 0 || task.status === 6"
               type="primary"
               size="large"
               @click="handleAccept"
             >
-              {{ task.status === 4 ? '重新接单' : '立即接单' }}
+              {{ task.status === 6 ? '重新接单' : '立即接单' }}
             </el-button>
 
-            <!-- 进行中状态：根据取件状态显示不同按钮 -->
-            <template v-if="task.status === 1">
-              <!-- 未取件：显示确认取件按钮 -->
+            <!-- 进行中状态：显示提货按钮 -->
+            <template v-if="task.status === 1 && task.runnerId === userStore.userInfo?.id">
               <el-button
-                v-if="!task.pickupTime"
                 type="warning"
                 size="large"
                 @click="handlePickup"
               >
-                确认取件
+                确认提货
               </el-button>
-              
-              <!-- 已取件：显示确认送达按钮 -->
-              <el-button
-                v-if="task.pickupTime"
-                type="success"
-                size="large"
-                @click="handleDeliver"
-              >
-                确认送达
-              </el-button>
-              
-              <!-- 取消/退回按钮始终显示 -->
               <el-button
                 type="danger"
                 size="large"
                 plain
                 @click="handleCancel"
               >
-                {{ isRunner ? '退回任务' : '取消任务' }}
+                取消接单
+              </el-button>
+            </template>
+
+            <!-- 已提货状态：显示送达按钮 -->
+            <template v-if="task.status === 2 && task.runnerId === userStore.userInfo?.id">
+              <el-button
+                type="success"
+                size="large"
+                @click="handleDeliver"
+              >
+                确认送达
+              </el-button>
+            </template>
+
+            <!-- 待确认状态：等待发布者确认 -->
+            <template v-if="task.status === 3 && task.runnerId === userStore.userInfo?.id">
+              <el-button
+                type="info"
+                size="large"
+                disabled
+              >
+                等待发布者确认
               </el-button>
             </template>
 
             <!-- 已完成状态：评价发布者 -->
-            <template v-if="task.status === 2">
+            <template v-if="task.status === 4 && task.runnerId === userStore.userInfo?.id">
               <el-button
                 v-if="!task.isReviewed"
                 type="success"
@@ -154,14 +200,14 @@
 
           <!-- 其他用户视角（从任务大厅进入） -->
           <template v-if="!isPublisher && !isRunner">
-            <!-- 待接单或已退回状态：显示接单按钮 -->
+            <!-- 待接取或已退回状态：显示接单按钮 -->
             <el-button
-              v-if="task.status === 0 || task.status === 4"
+              v-if="task.status === 0 || task.status === 6"
               type="primary"
               size="large"
               @click="handleAccept"
             >
-              {{ task.status === 4 ? '重新接单' : '立即接单' }}
+              {{ task.status === 6 ? '重新接单' : '立即接单' }}
             </el-button>
 
             <!-- 其他状态：仅显示状态信息 -->
@@ -498,13 +544,31 @@ const handleSubmitReview = async () => {
 }
 
 const getStatusType = (status: number) => {
-  const types: Record<number, string> = { 0: 'info', 1: 'warning', 2: 'success', 3: 'danger', 4: 'warning' }
-  return types[status] || 'info'
+  const map: Record<number, string> = {
+    [-1]: 'info',
+    0: 'warning',
+    1: 'primary',
+    2: 'primary',
+    3: 'warning',
+    4: 'success',
+    5: 'danger',
+    6: 'info'
+  }
+  return map[status] || ''
 }
 
 const getStatusText = (status: number) => {
-  const texts: Record<number, string> = { 0: '待接单', 1: '进行中', 2: '已完成', 3: '已取消', 4: '已退回' }
-  return texts[status] || '未知'
+  const map: Record<number, string> = {
+    [-1]: '待发布',
+    0: '待接取',
+    1: '进行中',
+    2: '已提货',
+    3: '待确认',
+    4: '已完成',
+    5: '已取消',
+    6: '已退回'
+  }
+  return map[status] || '未知'
 }
 
 const handleAccept = async () => {
@@ -530,10 +594,28 @@ const handlePickup = async () => {
 const handleDeliver = async () => {
   try {
     await updateTaskStatus(task.value.id, { action: 'deliver' })
-    ElMessage.success('任务完成')
+    ElMessage.success('已确认送达，请等待发布者确认收到')
     loadTaskDetail()
   } catch (error) {
     console.error(error)
+  }
+}
+
+// 发布者确认收到物品
+const handleConfirmReceive = async () => {
+  try {
+    await ElMessageBox.confirm('确认已收到物品吗？确认后将创建待支付订单', '提示', {
+      confirmButtonText: '确认收到',
+      cancelButtonText: '取消',
+      type: 'success'
+    })
+    await updateTaskStatus(task.value.id, { action: 'confirm' })
+    ElMessage.success('确认成功，订单已创建，请及时支付赏金')
+    loadTaskDetail()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error(error)
+    }
   }
 }
 
@@ -589,21 +671,55 @@ const handleCancel = async () => {
 // 取消发布（发布者取消待接单的任务）
 const handleCancelPublish = async () => {
   try {
-    await ElMessageBox.confirm('确定取消发布该任务吗？', '提示', {
+    await ElMessageBox.confirm('确定取消发布该任务吗？将回到草稿状态，可重新修改发布。', '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
     })
     await updateTaskStatus(task.value.id, {
-      action: 'cancel',
+      action: 'cancelPublish',
       cancelReason: '发布者取消发布'
     })
-    ElMessage.success('任务已取消发布')
+    ElMessage.success('任务已取消发布，已转为草稿状态')
     loadTaskDetail()
   } catch (error: any) {
     if (error !== 'cancel') {
       console.error(error)
     }
+  }
+}
+
+const handlePublish = async () => {
+  try {
+    await ElMessageBox.confirm('确定发布该任务吗？发布后将在任务大厅显示。', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    await updateTaskStatus(task.value.id, {
+      action: 'publish',
+      cancelReason: ''
+    })
+    ElMessage.success('任务发布成功')
+    loadTaskDetail()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error(error)
+    }
+  }
+}
+
+// 跳转到订单详情
+const goToOrderDetail = async () => {
+  try {
+    const res: any = await getOrderByTask(task.value.id)
+    if (res.result) {
+      router.push(`/order/${res.result.id}`)
+    } else {
+      ElMessage.error('订单数据尚未生成，请稍后再试')
+    }
+  } catch (error: any) {
+    ElMessage.error(error.message || '获取订单信息失败')
   }
 }
 

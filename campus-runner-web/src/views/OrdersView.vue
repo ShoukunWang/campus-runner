@@ -41,14 +41,21 @@
           <el-radio-button :value="undefined">全部</el-radio-button>
           <el-radio-button :value="0">待支付</el-radio-button>
           <el-radio-button :value="1">已支付</el-radio-button>
-          <el-radio-button :value="2">已取消</el-radio-button>
+          <el-radio-button :value="2">退款中</el-radio-button>
           <el-radio-button :value="3">已退款</el-radio-button>
+          <el-radio-button :value="4">支付逾期</el-radio-button>
         </el-radio-group>
       </div>
 
       <!-- 订单列表 -->
-      <el-table :data="orders" v-loading="loading" style="width: 100%">
-        <el-table-column prop="orderNo" label="订单编号" width="200" />
+      <el-table :data="orders" v-loading="loading" style="width: 100%" @row-click="(row) => viewOrderDetail(row.id)">
+        <el-table-column prop="orderNo" label="订单编号" width="200">
+          <template #default="{ row }">
+            <el-link type="primary" @click.stop="viewOrderDetail(row.id)">
+              {{ row.orderNo }}
+            </el-link>
+          </template>
+        </el-table-column>
         <el-table-column prop="taskNo" label="任务编号" width="150" />
         <el-table-column prop="amount" label="订单金额" width="120">
           <template #default="{ row }">
@@ -77,7 +84,7 @@
             {{ formatDateTime(row.createTime) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" fixed="right" width="200">
+        <el-table-column label="操作" fixed="right" width="280">
           <template #default="{ row }">
             <el-button
               v-if="row.status === 0 && row.publisherId === userStore.userInfo?.id"
@@ -88,12 +95,12 @@
               支付
             </el-button>
             <el-button
-              v-if="row.status === 0"
+              v-if="row.status === 0 && row.runnerId === userStore.userInfo?.id"
               type="warning"
               size="small"
               @click="handleCancel(row)"
             >
-              取消
+              放弃收款
             </el-button>
             <el-button
               v-if="row.status === 1 && row.publisherId === userStore.userInfo?.id"
@@ -101,7 +108,23 @@
               size="small"
               @click="handleRefund(row)"
             >
-              退款
+              申请退款
+            </el-button>
+            <el-button
+              v-if="row.status === 2 && row.runnerId === userStore.userInfo?.id"
+              type="success"
+              size="small"
+              @click="handleAuditRefund(row, true)"
+            >
+              同意退款
+            </el-button>
+            <el-button
+              v-if="row.status === 2 && row.runnerId === userStore.userInfo?.id"
+              type="danger"
+              size="small"
+              @click="handleAuditRefund(row, false)"
+            >
+              拒绝退款
             </el-button>
             <el-button
               type="info"
@@ -163,7 +186,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { getMyOrders, payOrder, cancelOrder, refundOrder, getOrderStatistics } from '@/api/order'
+import { getMyOrders, payOrder, cancelOrder, applyRefund, auditRefund, getOrderStatistics } from '@/api/order'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -218,8 +241,9 @@ const getStatusType = (status: number) => {
   const typeMap: Record<number, string> = {
     0: 'warning',
     1: 'success',
-    2: 'info',
-    3: 'danger'
+    2: 'warning',
+    3: 'info',
+    4: 'danger'
   }
   return typeMap[status] || ''
 }
@@ -228,8 +252,9 @@ const getStatusText = (status: number) => {
   const textMap: Record<number, string> = {
     0: '待支付',
     1: '已支付',
-    2: '已取消',
-    3: '已退款'
+    2: '退款中',
+    3: '已退款',
+    4: '支付逾期'
   }
   return textMap[status] || '未知'
 }
@@ -296,17 +321,42 @@ const submitRefund = async () => {
   }
   
   try {
-    await refundOrder(refundForm.value.orderId, { reason: refundForm.value.reason })
-    ElMessage.success('退款申请已提交')
+    await applyRefund(refundForm.value.orderId, { reason: refundForm.value.reason })
+    ElMessage.success('退款申请已提交，请等待跑腿员审核')
     refundDialogVisible.value = false
     loadOrders()
   } catch (error: any) {
-    ElMessage.error(error.message || '退款失败')
+    ElMessage.error(error.message || '退款申请失败')
+  }
+}
+
+const handleAuditRefund = async (order: any, agreed: boolean) => {
+  try {
+    const title = agreed ? '同意退款' : '拒绝退款'
+    const message = agreed ? '确认同意该退款申请？' : '确认拒绝该退款申请？'
+    
+    await ElMessageBox.confirm(message, title, {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    
+    await auditRefund(order.id, { agreed })
+    ElMessage.success(agreed ? '已同意退款' : '已拒绝退款')
+    loadOrders()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '审核失败')
+    }
   }
 }
 
 const viewTaskDetail = (taskId: string) => {
   router.push(`/task/${taskId}`)
+}
+
+const viewOrderDetail = (orderId: string) => {
+  router.push(`/order/${orderId}`)
 }
 
 onMounted(() => {

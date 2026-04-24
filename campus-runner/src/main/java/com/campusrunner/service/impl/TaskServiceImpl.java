@@ -43,8 +43,8 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         Page<Task> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Task> wrapper = new LambdaQueryWrapper<>();
         
-        // 查询待接单(0)和已退回(4)状态的任务，已退回的任务可以被重新接单
-        wrapper.in(Task::getStatus, Arrays.asList(0, 4));
+        // 查询待接取(0)和已退回(6)状态的任务，在大厅显示
+        wrapper.in(Task::getStatus, Arrays.asList(0, 6));
         
         if (StrUtil.isNotBlank(categoryId)) {
             wrapper.eq(Task::getCategoryId, categoryId);
@@ -146,8 +146,8 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         if (task == null) {
             throw new RuntimeException("任务不存在");
         }
-        // 允许待接单(0)和已退回(4)状态的任务被接单
-        if (task.getStatus() != 0 && task.getStatus() != 4) {
+        // 允许待接取(0)和已退回(6)状态的任务被接单
+        if (task.getStatus() != 0 && task.getStatus() != 6) {
             throw new RuntimeException("该任务不可被接取");
         }
         if (task.getPublisherId().equals(runnerId)) {
@@ -188,24 +188,68 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         LocalDateTime now = LocalDateTime.now();
         
         switch (action) {
-            case "pickup":
-                if (task.getStatus() != 1) {
-                    throw new RuntimeException("当前状态不允许取件");
+            // ========== 发布者操作 ==========
+            case "publish":
+                // 发布草稿任务
+                if (task.getStatus() != -1 && task.getStatus() != 5) {
+                    throw new RuntimeException("只有草稿或已取消的任务可以发布");
                 }
+                task.setStatus(0); // 待接取
+                break;
+                
+            case "save":
+                // 保存草稿（发布前暂存）
+                // 不检查状态，直接修改内容但不发布
+                break;
+                
+            case "cancelPublish":
+                // 发布者取消发布，回到草稿状态（而不是直接作废）
+                if (task.getStatus() != 0) {
+                    throw new RuntimeException("只有已发布且未接单的任务可以取消发布");
+                }
+                if (!task.getPublisherId().equals(operatorId)) {
+                    throw new RuntimeException("只有任务发布者可以取消发布");
+                }
+                task.setStatus(-1); // 回到待发布（草稿）状态
+                break;
+                
+            // ========== 跑腿员操作 ==========
+            case "pickup":
+                // 确认提货
+                if (task.getStatus() != 1) {
+                    throw new RuntimeException("只有已接单的任务可以提货");
+                }
+                if (!task.getRunnerId().equals(operatorId)) {
+                    throw new RuntimeException("只有当前跑腿员可以提货");
+                }
+                task.setStatus(2); // 已提货
                 task.setPickupTime(now);
                 break;
+                
             case "deliver":
-                if (task.getStatus() != 1) {
-                    throw new RuntimeException("当前状态不允许送达");
+                // 确认送达
+                if (task.getStatus() != 2) {
+                    throw new RuntimeException("只有已提货的任务可以送达");
                 }
-                if (task.getPickupTime() == null) {
-                    throw new RuntimeException("请先确认取件");
+                if (!task.getRunnerId().equals(operatorId)) {
+                    throw new RuntimeException("只有当前跑腿员可以确认送达");
                 }
+                task.setStatus(3); // 待确认 - 已送达，待发布者确认
                 task.setDeliverTime(now);
-                task.setStatus(2);
+                break;
+                
+            case "confirm":
+                // 发布者确认收到
+                if (task.getStatus() != 3) {
+                    throw new RuntimeException("只有待确认状态的任务可以确认完成");
+                }
+                if (!task.getPublisherId().equals(operatorId)) {
+                    throw new RuntimeException("只有任务发布者可以确认完成");
+                }
+                task.setStatus(4); // 已完成
                 task.setCompleteTime(now);
                 
-                // 任务完成后，更新用户统计数据
+                // 任务确认完成后，更新跑腿员统计数据
                 User runner = userMapper.selectById(task.getRunnerId());
                 if (runner != null) {
                     runner.setCompletedTasks(runner.getCompletedTasks() + 1);
@@ -224,13 +268,10 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
                 task.setUpdateTime(now);
                 baseMapper.updateById(task);
                 
-                // 注意：订单创建不在当前事务中，由OrderService自己的事务管理
-                // 如果订单创建失败，不影响任务完成
-                // 这里直接调用，OrderService的@Transactional会开启新事务
-                // 但由于在同一个类中调用，需要通过Spring代理才能生效
-                // 所以我们采用try-catch，即使失败也不影响任务
+                // 发布者确认后才创建订单
+                // 注意：直接传内存中的task对象，避免MyBatis缓存导致查询到旧状态
                 try {
-                    orderService.createOrderFromTask(taskId);
+                    orderService.createOrderFromTask(task);
                 } catch (Exception e) {
                     System.err.println("[严重] 订单创建失败，任务ID: " + taskId + ", 错误: " + e.getMessage());
                     e.printStackTrace();
@@ -238,21 +279,11 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
                 
                 // 返回最新的任务信息
                 return baseMapper.selectById(taskId);
-            case "cancel":
-                // 发布者取消任务（待接单或进行中都可以取消）
-                if (task.getStatus() == 2) {
-                    throw new RuntimeException("已完成任务不能取消");
-                }
-                if (StrUtil.isBlank(cancelReason)) {
-                    throw new RuntimeException("请填写取消原因");
-                }
-                task.setStatus(3); // 已取消（发布者取消，任务作废）
-                task.setCancelReason(cancelReason);
-                break;
+                
             case "return":
-                // 跑腿员退回任务（只有进行中的任务可以退回）
+                // 跑腿员退回任务（已接单但未提货时可以退回）
                 if (task.getStatus() != 1) {
-                    throw new RuntimeException("当前状态不允许退回");
+                    throw new RuntimeException("只有已接单但未提货的任务可以退回");
                 }
                 if (!task.getRunnerId().equals(operatorId)) {
                     throw new RuntimeException("只有当前跑腿员可以退回任务");
@@ -260,11 +291,12 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
                 if (StrUtil.isBlank(cancelReason)) {
                     throw new RuntimeException("请填写退回原因");
                 }
-                task.setStatus(4); // 已退回（跑腿员退回，任务重新开放）
+                task.setStatus(6); // 已退回 - 退回任务大厅
                 task.setRunnerId(null); // 清空跑腿员
                 task.setAcceptTime(null); // 清空接单时间
                 task.setCancelReason("跑腿员退回：" + cancelReason);
                 break;
+                
             default:
                 throw new RuntimeException("无效的操作");
         }
@@ -287,8 +319,9 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         if (!task.getPublisherId().equals(publisherId)) {
             throw new RuntimeException("只有发布者可以修改任务");
         }
-        if (task.getStatus() != 0) {
-            throw new RuntimeException("只有待接单状态的任务可以修改");
+        // 草稿(-1)、已取消(5)、待接取(0)状态可以修改
+        if (task.getStatus() != -1 && task.getStatus() != 0 && task.getStatus() != 5) {
+            throw new RuntimeException("只有草稿、已取消或未接单的任务可以修改");
         }
         
         if (StrUtil.isNotBlank(title)) {

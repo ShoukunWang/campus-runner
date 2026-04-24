@@ -26,14 +26,32 @@ const props = defineProps<{
 
 const router = useRouter()
 
-const getStatusType = (status: number) => {
-  const types: Record<number, string> = { 0: 'info', 1: 'warning', 2: 'success', 3: 'danger' }
-  return types[status] || 'info'
+const getStatusText = (status: number) => {
+  const map: Record<number, string> = {
+    [-1]: '待发布',
+    0: '待接取',
+    1: '进行中',
+    2: '已提货',
+    3: '待确认',
+    4: '已完成',
+    5: '已取消',
+    6: '待接取' // 已退回的任务在大厅重新显示，外观与待接取一致
+  }
+  return map[status] || '未知'
 }
 
-const getStatusText = (status: number) => {
-  const texts: Record<number, string> = { 0: '待接单', 1: '进行中', 2: '已完成', 3: '已取消' }
-  return texts[status] || '未知'
+const getStatusType = (status: number) => {
+  const map: Record<number, string> = {
+    [-1]: 'info',
+    0: 'warning',
+    1: 'primary',
+    2: 'primary',
+    3: 'warning',
+    4: 'success',
+    5: 'danger',
+    6: 'warning' // 已退回的任务在大厅重新显示，外观与待接取一致
+  }
+  return map[status] || ''
 }
 
 const formatTime = (time: string) => {

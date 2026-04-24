@@ -27,29 +27,29 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     private TaskMapper taskMapper;
 
     @Override
-    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
-    public Order createOrderFromTask(String taskId) {
-        // 查询任务
-        Task task = taskMapper.selectById(taskId);
-        if (task == null) {
-            throw new RuntimeException("任务不存在");
-        }
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public Order createOrderFromTask(Task task) {
+        System.out.println("========================================");
+        System.out.println("[订单创建] 开始，任务ID: " + task.getId());
+        System.out.println("[订单创建] 任务状态（内存中）: " + task.getStatus());
 
-        // 校验任务状态：只有已完成的任务才能创建订单
-        if (task.getStatus() != 2) {
-            throw new RuntimeException("只有已完成的任务才能创建订单");
+        // 校验任务状态：只有已完成(4)的任务才能创建订单
+        if (task.getStatus() != 4) {
+            System.err.println("[订单创建] 失败：任务状态不正确，需要4，实际是: " + task.getStatus());
+            throw new RuntimeException("只有发布者确认完成的任务才能创建订单，当前状态=" + task.getStatus());
         }
 
         // 检查是否已存在订单
-        Order existingOrder = getOrderByTaskId(taskId);
+        Order existingOrder = getOrderByTaskId(task.getId());
         if (existingOrder != null) {
+            System.err.println("[订单创建] 失败：该任务已创建订单，订单ID: " + existingOrder.getId());
             throw new RuntimeException("该任务已创建订单");
         }
 
         // 创建订单
         Order order = new Order();
         order.setOrderNo(generateOrderNo());
-        order.setTaskId(taskId);
+        order.setTaskId(task.getId());
         order.setTaskNo(task.getTaskNo());
         order.setPublisherId(task.getPublisherId());
         order.setRunnerId(task.getRunnerId());
@@ -58,8 +58,21 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         order.setCreateTime(LocalDateTime.now());
         order.setUpdateTime(LocalDateTime.now());
 
+        System.out.println("[订单创建] 准备插入数据库，表名: task_order");
         baseMapper.insert(order);
+        System.out.println("[订单创建] 成功！订单ID: " + order.getId() + ", 订单号: " + order.getOrderNo());
+        System.out.println("========================================");
         return order;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Order createOrderFromTask(String taskId) {
+        Task task = taskMapper.selectById(taskId);
+        if (task == null) {
+            throw new RuntimeException("任务不存在");
+        }
+        return createOrderFromTask(task);
     }
 
     @Override
@@ -105,9 +118,14 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             throw new RuntimeException("只有待支付订单可以取消");
         }
 
-        // 校验权限（发布者或跑腿员都可以取消）
-        if (!order.getPublisherId().equals(userId) && !order.getRunnerId().equals(userId)) {
-            throw new RuntimeException("无权取消该订单");
+        // ====================== 公平性设计 ======================
+        // 任务既然已经确认完成（双方无争议才创建的订单），发布者就无权取消了！
+        // 只能由跑腿员主动取消（跑腿员放弃赏金）或由管理员后台仲裁
+        // ========================================================
+        
+        // 校验权限：只有跑腿员可以取消订单（发布者不能取消！）
+        if (!order.getRunnerId().equals(userId)) {
+            throw new RuntimeException("只有跑腿员可以取消订单。若有争议请联系平台客服仲裁");
         }
 
         order.setStatus(2); // 已取消
@@ -121,28 +139,61 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
     @Override
     @Transactional
-    public Order refundOrder(String orderId, String userId, String reason) {
+    public Order applyRefund(String orderId, String userId, String reason) {
         Order order = baseMapper.selectById(orderId);
         if (order == null) {
             throw new RuntimeException("订单不存在");
         }
 
-        // 只有已支付状态可以退款
+        // 只有已支付状态可以申请退款
         if (order.getStatus() != 1) {
-            throw new RuntimeException("只有已支付订单可以退款");
+            throw new RuntimeException("只有已支付订单可以申请退款");
         }
 
         // 校验权限（只有发布者可以申请退款）
         if (!order.getPublisherId().equals(userId)) {
-            throw new RuntimeException("只有订单创建者可以申请退款");
+            throw new RuntimeException("只有发布者可以申请退款");
         }
 
-        order.setStatus(3); // 已退款
+        order.setStatus(2); // 退款中 - 待跑腿员审核
         order.setRefundTime(LocalDateTime.now());
         order.setRefundReason(reason);
         order.setUpdateTime(LocalDateTime.now());
         baseMapper.updateById(order);
 
+        return order;
+    }
+
+    @Override
+    @Transactional
+    public Order auditRefund(String orderId, String userId, Boolean agreed, String rejectReason) {
+        Order order = baseMapper.selectById(orderId);
+        if (order == null) {
+            throw new RuntimeException("订单不存在");
+        }
+
+        // 只有退款中状态可以审核
+        if (order.getStatus() != 2) {
+            throw new RuntimeException("只有退款中状态的订单可以审核");
+        }
+
+        // 校验权限（只有跑腿员可以审核退款）
+        if (!order.getRunnerId().equals(userId)) {
+            throw new RuntimeException("只有跑腿员可以审核退款申请");
+        }
+
+        if (agreed) {
+            // 同意退款
+            order.setStatus(3); // 已退款
+            order.setUpdateTime(LocalDateTime.now());
+        } else {
+            // 拒绝退款，回到已支付状态
+            order.setStatus(1); // 回到已支付
+            order.setRefundReason("拒绝退款：" + (rejectReason != null ? rejectReason : "跑腿员不同意退款"));
+            order.setUpdateTime(LocalDateTime.now());
+        }
+
+        baseMapper.updateById(order);
         return order;
     }
 

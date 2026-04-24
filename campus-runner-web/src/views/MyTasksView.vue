@@ -91,23 +91,29 @@ const acceptedActiveStatus = ref<number | 'all'>('all')
 // 状态标签配置（我发布的）
 const publishedStatusConfig = [
   { value: 'all', label: '全部', status: null },
-  { value: 0, label: '待接单', type: 'info' },
-  { value: 1, label: '进行中', type: 'warning' },
-  { value: 2, label: '已完成', type: 'success' },
-  { value: 3, label: '已取消', type: 'danger' }
+  { value: -1, label: '待发布', type: 'info' },
+  { value: 0, label: '待接取', type: 'warning' },
+  { value: 1, label: '进行中', type: 'primary' },
+  { value: 2, label: '已提货', type: 'primary' },
+  { value: 3, label: '待确认', type: 'warning' },
+  { value: 4, label: '已完成', type: 'success' },
+  { value: 5, label: '已取消', type: 'danger' },
+  { value: 6, label: '已退回', type: 'info' }
 ]
 
 // 状态标签配置（我接受的）
 const acceptedStatusConfig = [
   { value: 'all', label: '全部', status: null },
-  { value: 1, label: '进行中', type: 'warning' },
-  { value: 2, label: '已完成', type: 'success' },
-  { value: 3, label: '已取消', type: 'danger' }
+  { value: 1, label: '进行中', type: 'primary' },
+  { value: 2, label: '已提货', type: 'primary' },
+  { value: 3, label: '待确认', type: 'warning' },
+  { value: 4, label: '已完成', type: 'success' },
+  { value: 6, label: '已退回', type: 'info' }
 ]
 
 // 按状态分组的计算属性
 const publishedTasksByStatus = computed(() => {
-  const groups: Record<number, any[]> = { 0: [], 1: [], 2: [], 3: [] }
+  const groups: Record<number, any[]> = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [] }
   publishedTasks.value.forEach(task => {
     const status = task.status || 0
     if (!groups[status]) groups[status] = []
@@ -117,7 +123,7 @@ const publishedTasksByStatus = computed(() => {
 })
 
 const acceptedTasksByStatus = computed(() => {
-  const groups: Record<number, any[]> = { 0: [], 1: [], 2: [], 3: [] }
+  const groups: Record<number, any[]> = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [] }
   acceptedTasks.value.forEach(task => {
     const status = task.status || 0
     if (!groups[status]) groups[status] = []
