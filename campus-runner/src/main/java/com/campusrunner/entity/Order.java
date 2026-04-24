@@ -7,31 +7,39 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("payment")
-public class Payment {
+@TableName("task_order")
+public class Order {
 
     @TableId(type = IdType.ASSIGN_UUID)
     private String id;
 
-    private String paymentNo;
+    private String orderNo;
 
     private String taskId;
 
-    private String payerId;
+    private String taskNo;
 
-    private String payeeId;
+    private String publisherId;
+
+    private String runnerId;
 
     private BigDecimal amount;
-
-    private Integer paymentType;
 
     private Integer status;
 
     private LocalDateTime payTime;
 
+    private LocalDateTime cancelTime;
+
+    private String cancelReason;
+
     private LocalDateTime refundTime;
 
     private String refundReason;
+
+    private String paymentNo;
+
+    private Integer paymentType;
 
     private String createBy;
 

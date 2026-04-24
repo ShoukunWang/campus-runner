@@ -8,6 +8,7 @@ import com.campusrunner.entity.Task;
 import com.campusrunner.entity.User;
 import com.campusrunner.mapper.TaskMapper;
 import com.campusrunner.mapper.UserMapper;
+import com.campusrunner.service.OrderService;
 import com.campusrunner.service.TaskService;
 import com.campusrunner.utils.SnowflakeIdUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,14 +34,17 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
     @Autowired
     private SnowflakeIdUtil snowflakeIdUtil;
 
+    @Autowired
+    private OrderService orderService;
+
     @Override
     public Page<Task> getTaskList(Integer pageNum, Integer pageSize, String categoryId, Integer taskType,
                                  BigDecimal minReward, BigDecimal maxReward, String area, String keyword, String sortField) {
         Page<Task> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Task> wrapper = new LambdaQueryWrapper<>();
         
-        // 查询待接单(0)和已取消(3)状态的任务，已取消的任务可以被重新接单
-        wrapper.in(Task::getStatus, Arrays.asList(0, 3));
+        // 查询待接单(0)和已退回(4)状态的任务，已退回的任务可以被重新接单
+        wrapper.in(Task::getStatus, Arrays.asList(0, 4));
         
         if (StrUtil.isNotBlank(categoryId)) {
             wrapper.eq(Task::getCategoryId, categoryId);
@@ -142,9 +146,9 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         if (task == null) {
             throw new RuntimeException("任务不存在");
         }
-        // 允许待接单(0)和已取消(3)状态的任务被接单
-        if (task.getStatus() != 0 && task.getStatus() != 3) {
-            throw new RuntimeException("任务已被接单");
+        // 允许待接单(0)和已退回(4)状态的任务被接单
+        if (task.getStatus() != 0 && task.getStatus() != 4) {
+            throw new RuntimeException("该任务不可被接取");
         }
         if (task.getPublisherId().equals(runnerId)) {
             throw new RuntimeException("不能接自己发布的任务");
@@ -171,6 +175,16 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
             throw new RuntimeException("任务不存在");
         }
         
+        System.out.println("========== updateTaskStatus 调试信息 ==========");
+        System.out.println("taskId: " + taskId);
+        System.out.println("action: " + action);
+        System.out.println("cancelReason: " + cancelReason);
+        System.out.println("operatorId: " + operatorId);
+        System.out.println("task.status: " + task.getStatus());
+        System.out.println("task.runnerId: " + task.getRunnerId());
+        System.out.println("task.publisherId: " + task.getPublisherId());
+        System.out.println("================================================");
+        
         LocalDateTime now = LocalDateTime.now();
         
         switch (action) {
@@ -190,16 +204,66 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
                 task.setDeliverTime(now);
                 task.setStatus(2);
                 task.setCompleteTime(now);
-                break;
+                
+                // 任务完成后，更新用户统计数据
+                User runner = userMapper.selectById(task.getRunnerId());
+                if (runner != null) {
+                    runner.setCompletedTasks(runner.getCompletedTasks() + 1);
+                    runner.setTotalTasks(runner.getTotalTasks() + 1);
+                    // 重新计算完成率
+                    if (runner.getTotalTasks() > 0) {
+                        runner.setCompletionRate(
+                            new BigDecimal(runner.getCompletedTasks())
+                                .divide(new BigDecimal(runner.getTotalTasks()), 4, RoundingMode.HALF_UP)
+                                .multiply(new BigDecimal("100"))
+                        );
+                    }
+                    userMapper.updateById(runner);
+                }
+                
+                task.setUpdateTime(now);
+                baseMapper.updateById(task);
+                
+                // 注意：订单创建不在当前事务中，由OrderService自己的事务管理
+                // 如果订单创建失败，不影响任务完成
+                // 这里直接调用，OrderService的@Transactional会开启新事务
+                // 但由于在同一个类中调用，需要通过Spring代理才能生效
+                // 所以我们采用try-catch，即使失败也不影响任务
+                try {
+                    orderService.createOrderFromTask(taskId);
+                } catch (Exception e) {
+                    System.err.println("[严重] 订单创建失败，任务ID: " + taskId + ", 错误: " + e.getMessage());
+                    e.printStackTrace();
+                }
+                
+                // 返回最新的任务信息
+                return baseMapper.selectById(taskId);
             case "cancel":
+                // 发布者取消任务（待接单或进行中都可以取消）
                 if (task.getStatus() == 2) {
                     throw new RuntimeException("已完成任务不能取消");
                 }
                 if (StrUtil.isBlank(cancelReason)) {
                     throw new RuntimeException("请填写取消原因");
                 }
-                task.setStatus(3);
+                task.setStatus(3); // 已取消（发布者取消，任务作废）
                 task.setCancelReason(cancelReason);
+                break;
+            case "return":
+                // 跑腿员退回任务（只有进行中的任务可以退回）
+                if (task.getStatus() != 1) {
+                    throw new RuntimeException("当前状态不允许退回");
+                }
+                if (!task.getRunnerId().equals(operatorId)) {
+                    throw new RuntimeException("只有当前跑腿员可以退回任务");
+                }
+                if (StrUtil.isBlank(cancelReason)) {
+                    throw new RuntimeException("请填写退回原因");
+                }
+                task.setStatus(4); // 已退回（跑腿员退回，任务重新开放）
+                task.setRunnerId(null); // 清空跑腿员
+                task.setAcceptTime(null); // 清空接单时间
+                task.setCancelReason("跑腿员退回：" + cancelReason);
                 break;
             default:
                 throw new RuntimeException("无效的操作");

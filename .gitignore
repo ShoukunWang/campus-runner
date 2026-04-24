@@ -1,27 +1,59 @@
-# Java
-target/
-*.iml
-.idea/
-*.log
-
-# 前端
-node_modules/
-dist/
-.env
+# ==============================================
+# 通用系统隐藏文件（全项目通用，Windows/Mac垃圾文件）
+# ==============================================
 .DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.bak
 
-# 其他
+# ==============================================
+# 后端 SpringBoot + Maven 模块 campus-runner
+# ==============================================
+# Maven 编译打包产物，全部自动生成，完全不上传
+target/
+
+# IDEA 全项目本地配置缓存，全部忽略
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Qoder AI 插件项目本地配置、缓存、索引
+.qoder/
+
+# Fast Request 接口调试插件本地接口、环境、Token缓存
+.fastRequest/
+
+# Java 编译临时文件
+*.class
 *.jar
 *.war
+*.ear
 
-* text=auto
-*.ts text eol=lf
-*.vue text eol=lf
-*.js text eol=lf
-*.json text eol=lf
-*.yml text eol=lf
-*.md text eol=lf
+# ==============================================
+# 前端 Vue3 + TypeScript 模块 campus-runner-web
+# ==============================================
+# 前端庞大依赖包，绝对不上传Git
+node_modules/
 
-# 让idea/target不自动转换换行
-.idea/ binary
-target/ binary
+# 前端打包编译产物（dist文件夹，你目前没生成，提前加上）
+dist/
+build/
+
+# VSCode 编辑器本地配置缓存
+.vscode/
+
+# 前端运行临时缓存
+.DS_Store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp/
+.pnp.js
+
+# 环境变量本地私有文件（后面你加了数据库密码、本地env配置必备）
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

@@ -234,6 +234,12 @@ public class AdminServiceImpl extends ServiceImpl<AdminMapper, Admin> implements
         long totalCancelledTasks = taskMapper.selectCount(
                 new LambdaQueryWrapper<Task>().eq(Task::getStatus, 3));
 
+        // 计算总酬金
+        List<Task> allTasks = taskMapper.selectList(null);
+        BigDecimal totalReward = allTasks.stream()
+                .map(Task::getReward)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         LocalDate today = LocalDate.now();
         LocalDateTime todayStart = today.atStartOfDay();
         LocalDateTime todayEnd = today.plusDays(1).atStartOfDay();
@@ -254,51 +260,6 @@ public class AdminServiceImpl extends ServiceImpl<AdminMapper, Admin> implements
                         .ge(Task::getCompleteTime, todayStart)
                         .lt(Task::getCompleteTime, todayEnd));
 
-        // 计算总收益（已完成任务的reward总和）
-        BigDecimal totalRevenue = taskMapper.selectList(
-                new LambdaQueryWrapper<Task>().eq(Task::getStatus, 2)
-        ).stream().map(Task::getReward).reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        // 计算今日收益
-        BigDecimal todayRevenue = taskMapper.selectList(
-                new LambdaQueryWrapper<Task>()
-                        .eq(Task::getStatus, 2)
-                        .ge(Task::getCompleteTime, todayStart)
-                        .lt(Task::getCompleteTime, todayEnd)
-        ).stream().map(Task::getReward).reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        // 计算平均任务酬金
-        BigDecimal avgReward = BigDecimal.ZERO;
-        if (totalTasks > 0) {
-            BigDecimal allRevenue = taskMapper.selectList(
-                    new LambdaQueryWrapper<Task>()
-            ).stream().map(Task::getReward).reduce(BigDecimal.ZERO, BigDecimal::add);
-            avgReward = allRevenue.divide(new BigDecimal(totalTasks), 2, BigDecimal.ROUND_HALF_UP);
-        }
-
-        // 计算任务完成率
-        double completionRate = totalTasks > 0 ? (double) totalCompletedTasks / totalTasks * 100 : 0;
-
-        // 近7天任务趋势
-        List<Map<String, Object>> last7DaysTrend = new ArrayList<>();
-        for (int i = 6; i >= 0; i--) {
-            LocalDate date = today.minusDays(i);
-            LocalDateTime dayStart = date.atStartOfDay();
-            LocalDateTime dayEnd = date.plusDays(1).atStartOfDay();
-            
-            long count = taskMapper.selectCount(
-                    new LambdaQueryWrapper<Task>()
-                            .ge(Task::getCreateTime, dayStart)
-                            .lt(Task::getCreateTime, dayEnd)
-            );
-            
-            Map<String, Object> dayData = new HashMap<>();
-            dayData.put("date", date.toString());
-            dayData.put("label", date.getMonthValue() + "/" + date.getDayOfMonth());
-            dayData.put("count", count);
-            last7DaysTrend.add(dayData);
-        }
-
         Map<String, Object> overview = new HashMap<>();
         overview.put("totalUsers", totalUsers);
         overview.put("totalTasks", totalTasks);
@@ -306,15 +267,12 @@ public class AdminServiceImpl extends ServiceImpl<AdminMapper, Admin> implements
         overview.put("totalPendingTasks", totalPendingTasks);
         overview.put("totalOngoingTasks", totalOngoingTasks);
         overview.put("totalCancelledTasks", totalCancelledTasks);
-        overview.put("totalRevenue", totalRevenue);
-        overview.put("avgReward", avgReward);
-        overview.put("completionRate", String.format("%.1f", completionRate));
+        overview.put("totalReward", totalReward);
 
         Map<String, Object> todayStats = new HashMap<>();
         todayStats.put("newUsers", todayNewUsers);
         todayStats.put("newTasks", todayNewTasks);
         todayStats.put("completedTasks", todayCompletedTasks);
-        todayStats.put("revenue", todayRevenue);
 
         Map<String, Long> statusStats = new HashMap<>();
         statusStats.put("pending", totalPendingTasks);
@@ -325,7 +283,6 @@ public class AdminServiceImpl extends ServiceImpl<AdminMapper, Admin> implements
         result.put("overview", overview);
         result.put("today", todayStats);
         result.put("taskStatusStats", statusStats);
-        result.put("last7DaysTrend", last7DaysTrend);
 
         return result;
     }

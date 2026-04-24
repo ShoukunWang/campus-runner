@@ -90,9 +90,11 @@ CREATE TABLE `task` (
     `contact_name` VARCHAR(50) DEFAULT NULL COMMENT '联系人姓名',
     `contact_phone` VARCHAR(20) DEFAULT NULL COMMENT '联系人电话',
     `remarks` VARCHAR(500) DEFAULT NULL COMMENT '备注',
-    `status` TINYINT DEFAULT 0 COMMENT '任务状态：0-待接单，1-进行中，2-已完成，3-已取消',
+    `status` TINYINT DEFAULT 0 COMMENT '任务状态：0-待接单，1-进行中，2-已完成，3-已取消（发布者取消），4-已退回（跑腿员退回）',
     `runner_id` VARCHAR(32) DEFAULT NULL COMMENT '接单跑腿员ID',
     `accept_time` DATETIME DEFAULT NULL COMMENT '接单时间',
+    `pickup_time` DATETIME DEFAULT NULL COMMENT '取件时间', -- 新增字段
+    `deliver_time` DATETIME DEFAULT NULL COMMENT '送达时间', -- 新增字段
     `complete_time` DATETIME DEFAULT NULL COMMENT '完成时间',
     `cancel_reason` VARCHAR(255) DEFAULT NULL COMMENT '取消原因',
     `view_count` INT DEFAULT 0 COMMENT '浏览次数',
@@ -112,6 +114,37 @@ CREATE TABLE `task` (
     KEY `idx_reward` (`reward`),
     KEY `idx_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='任务表';
+
+-- 订单表
+CREATE TABLE `task_order` (
+    `id` VARCHAR(32) NOT NULL COMMENT '订单ID',
+    `order_no` VARCHAR(32) NOT NULL COMMENT '订单编号',
+    `task_id` VARCHAR(32) NOT NULL COMMENT '任务ID',
+    `task_no` VARCHAR(32) NOT NULL COMMENT '任务编号',
+    `publisher_id` VARCHAR(32) NOT NULL COMMENT '发布者ID（付款人）',
+    `runner_id` VARCHAR(32) NOT NULL COMMENT '跑腿员ID（收款人）',
+    `amount` DECIMAL(10,2) NOT NULL COMMENT '订单金额（元）',
+    `status` TINYINT DEFAULT 0 COMMENT '订单状态：0-待支付，1-已支付，2-已取消，3-已退款',
+    `pay_time` DATETIME DEFAULT NULL COMMENT '支付时间',
+    `cancel_time` DATETIME DEFAULT NULL COMMENT '取消时间',
+    `cancel_reason` VARCHAR(255) DEFAULT NULL COMMENT '取消原因',
+    `refund_time` DATETIME DEFAULT NULL COMMENT '退款时间',
+    `refund_reason` VARCHAR(255) DEFAULT NULL COMMENT '退款原因',
+    `payment_no` VARCHAR(32) DEFAULT NULL COMMENT '支付流水号',
+    `payment_type` TINYINT DEFAULT 1 COMMENT '支付类型：1-任务酬金，2-平台服务费',
+    `create_by` VARCHAR(32) DEFAULT NULL COMMENT '创建人',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_by` VARCHAR(32) DEFAULT NULL COMMENT '更新人',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `is_deleted` TINYINT DEFAULT 0 COMMENT '逻辑删除：0-未删除，1-已删除',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_order_no` (`order_no`),
+    UNIQUE KEY `uk_task_id` (`task_id`),
+    KEY `idx_publisher_id` (`publisher_id`),
+    KEY `idx_runner_id` (`runner_id`),
+    KEY `idx_status` (`status`),
+    KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单表';
 
 -- 收藏表
 CREATE TABLE `favorite` (
@@ -181,32 +214,6 @@ INSERT INTO `task_category` (`id`, `name`, `sort_order`, `status`) VALUES
 ('3', '跨校区送件', 3, 1),
 ('4', '文件传递', 4, 1),
 ('5', '其他', 5, 1);
-
--- 支付表
-CREATE TABLE `payment` (
-    `id` VARCHAR(32) NOT NULL,
-    `payment_no` VARCHAR(32) NOT NULL COMMENT '支付订单号',
-    `task_id` VARCHAR(32) NOT NULL COMMENT '任务ID',
-    `payer_id` VARCHAR(32) NOT NULL COMMENT '付款人ID',
-    `payee_id` VARCHAR(32) NOT NULL COMMENT '收款人ID',
-    `amount` DECIMAL(10,2) NOT NULL COMMENT '支付金额（元）',
-    `payment_type` TINYINT DEFAULT 1 COMMENT '支付类型：1-任务酬金，2-平台服务费',
-    `status` TINYINT DEFAULT 0 COMMENT '支付状态：0-待支付，1-已支付，2-已退款',
-    `pay_time` DATETIME DEFAULT NULL COMMENT '支付时间',
-    `refund_time` DATETIME DEFAULT NULL COMMENT '退款时间',
-    `refund_reason` VARCHAR(255) DEFAULT NULL COMMENT '退款原因',
-    `create_by` VARCHAR(32) DEFAULT NULL COMMENT '创建人',
-    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_by` VARCHAR(32) DEFAULT NULL COMMENT '更新人',
-    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `is_deleted` TINYINT DEFAULT 0 COMMENT '逻辑删除：0-未删除，1-已删除',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_payment_no` (`payment_no`),
-    KEY `idx_task_id` (`task_id`),
-    KEY `idx_payer_id` (`payer_id`),
-    KEY `idx_payee_id` (`payee_id`),
-    KEY `idx_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='支付表';
 
 -- 初始化系统配置（智能匹配算法权重）
 INSERT INTO `sys_config` (`id`, `config_key`, `config_value`, `description`) VALUES

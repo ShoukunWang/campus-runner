@@ -14,6 +14,9 @@ export const getTaskList = (params: {
   sortBy?: string
   sortOrder?: string
   keyword?: string
+  weightLevel?: string
+  minReward?: number
+  maxReward?: number
 }) => {
   return request.get('/task/list', { params })
 }
@@ -51,7 +54,7 @@ export const acceptTask = (taskId: string) => {
 
 // 更新任务状态
 export const updateTaskStatus = (taskId: string, data: {
-  action: 'pickup' | 'deliver' | 'cancel'
+  action: 'pickup' | 'deliver' | 'cancel' | 'return'
   cancelReason?: string
 }) => {
   return request.put(`/task/status/${taskId}`, data)
@@ -86,7 +89,7 @@ export const getRecommendedTasks = (params: {
   return request.get('/task/recommend', { params })
 }
 
-// 更新任务信息（发布者修改任务）
+// 更新任务信息(发布者修改任务)
 export const updateTask = (taskId: string, data: {
   title?: string
   description?: string
@@ -94,6 +97,7 @@ export const updateTask = (taskId: string, data: {
   deliveryAddress?: string
   reward?: number
   weight?: number
+  weightLevel?: string
   expectCompleteTime?: string
   contactName?: string
   contactPhone?: string

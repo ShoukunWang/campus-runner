@@ -81,10 +81,10 @@ const router = createRouter({
       meta: { requiresAuth: true, title: '我的收藏' }
     },
     {
-      path: '/payments',
-      name: 'payments',
-      component: () => import('@/views/PaymentsView.vue'),
-      meta: { requiresAuth: true, title: '支付记录' }
+      path: '/orders',
+      name: 'orders',
+      component: () => import('@/views/OrdersView.vue'),
+      meta: { requiresAuth: true, title: '我的订单' }
     },
   ],
 })

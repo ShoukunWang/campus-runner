@@ -96,14 +96,14 @@
 
           <!-- 跑腿员视角 -->
           <template v-if="isRunner">
-            <!-- 待接单或已取消状态：显示接单按钮 -->
+            <!-- 待接单或已退回状态：显示接单按钮 -->
             <el-button
-              v-if="task.status === 0 || task.status === 3"
+              v-if="task.status === 0 || task.status === 4"
               type="primary"
               size="large"
               @click="handleAccept"
             >
-              {{ task.status === 3 ? '重新接单' : '立即接单' }}
+              {{ task.status === 4 ? '重新接单' : '立即接单' }}
             </el-button>
 
             <!-- 进行中状态：根据取件状态显示不同按钮 -->
@@ -128,14 +128,14 @@
                 确认送达
               </el-button>
               
-              <!-- 取消按钮始终显示 -->
+              <!-- 取消/退回按钮始终显示 -->
               <el-button
                 type="danger"
                 size="large"
                 plain
                 @click="handleCancel"
               >
-                取消任务
+                {{ isRunner ? '退回任务' : '取消任务' }}
               </el-button>
             </template>
 
@@ -154,14 +154,14 @@
 
           <!-- 其他用户视角（从任务大厅进入） -->
           <template v-if="!isPublisher && !isRunner">
-            <!-- 待接单或已取消状态：显示接单按钮 -->
+            <!-- 待接单或已退回状态：显示接单按钮 -->
             <el-button
-              v-if="task.status === 0 || task.status === 3"
+              v-if="task.status === 0 || task.status === 4"
               type="primary"
               size="large"
               @click="handleAccept"
             >
-              {{ task.status === 3 ? '重新接单' : '立即接单' }}
+              {{ task.status === 4 ? '重新接单' : '立即接单' }}
             </el-button>
 
             <!-- 其他状态：仅显示状态信息 -->
@@ -299,7 +299,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Star, StarFilled } from '@element-plus/icons-vue'
 import { getTaskDetail, acceptTask, updateTaskStatus, updateTask, getCategoryList } from '@/api/task'
 import { toggleFavorite, checkFavorite } from '@/api/favorite'
-import { createPayment, pay } from '@/api/payment'
+import { getOrderByTask, payOrder } from '@/api/order'
 import { submitReview, getReviewList } from '@/api/review'
 import { useUserStore } from '@/stores/user'
 
@@ -365,10 +365,41 @@ const loadTaskDetail = async () => {
     checkFavoriteStatus()
     // 加载评价列表
     loadReviews()
+    // 加载订单状态，判断是否已支付
+    loadOrderStatus()
   } catch (error) {
     console.error(error)
   } finally {
     loading.value = false
+  }
+}
+
+const loadOrderStatus = async () => {
+  try {
+    // 只有已完成的任务才有订单
+    if (task.value.status === 2) {
+      const res: any = await getOrderByTask(task.value.id)
+      if (res.result) {
+        // 订单状态：0-待支付，1-已支付，2-已取消，3-已退款
+        task.value.isPaid = res.result.status === 1
+      } else {
+        // 订单不存在，可能是任务刚完成，订单还在创建中
+        // 等待1秒后重试一次
+        console.log('订单还未创建，等待重试...')
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        const retryRes: any = await getOrderByTask(task.value.id)
+        if (retryRes.result) {
+          task.value.isPaid = retryRes.result.status === 1
+        } else {
+          task.value.isPaid = false
+        }
+      }
+    }
+  } catch (error) {
+    // 订单查询失败不影响页面展示
+    console.warn('加载订单状态失败，设置为未支付', error)
+    task.value.isPaid = false
   }
 }
 
@@ -411,21 +442,24 @@ const handlePay = async () => {
       type: 'warning'
     })
 
-    // 创建支付订单
-    const createRes: any = await createPayment({
-      taskId: task.value.id,
-      payeeId: task.value.runnerId,
-      amount: task.value.reward,
-      paymentType: 1 // 任务赏金
-    })
+    // 查询订单（任务完成后自动创建）
+    const orderRes: any = await getOrderByTask(task.value.id)
+    
+    if (!orderRes.result) {
+      ElMessage.warning('订单还未创建，请稍后再试')
+      return
+    }
 
     // 执行支付
-    await pay(createRes.result.id)
+    await payOrder(orderRes.result.id)
     ElMessage.success('支付成功')
-    loadTaskDetail()
+    
+    // 重新加载任务详情和订单状态
+    await loadTaskDetail()
   } catch (error: any) {
     if (error !== 'cancel') {
       console.error(error)
+      ElMessage.error(error.message || '支付失败')
     }
   }
 }
@@ -464,12 +498,12 @@ const handleSubmitReview = async () => {
 }
 
 const getStatusType = (status: number) => {
-  const types: Record<number, string> = { 0: 'info', 1: 'warning', 2: 'success', 3: 'danger' }
+  const types: Record<number, string> = { 0: 'info', 1: 'warning', 2: 'success', 3: 'danger', 4: 'warning' }
   return types[status] || 'info'
 }
 
 const getStatusText = (status: number) => {
-  const texts: Record<number, string> = { 0: '待接单', 1: '进行中', 2: '已完成', 3: '已取消' }
+  const texts: Record<number, string> = { 0: '待接单', 1: '进行中', 2: '已完成', 3: '已取消', 4: '已退回' }
   return texts[status] || '未知'
 }
 
@@ -505,27 +539,49 @@ const handleDeliver = async () => {
 
 const handleCancel = async () => {
   try {
-    const { value } = await ElMessageBox.prompt('请输入取消原因', '取消任务', {
-      confirmButtonText: '确认取消',
-      cancelButtonText: '返回',
-      inputPlaceholder: '请输入取消原因...',
-      inputValidator: (value: string) => {
-        if (!value || value.trim() === '') {
-          return '取消原因不能为空'
+    // 判断是发布者还是跑腿员
+    const isRunnerCancel = isRunner.value
+    
+    console.log('=== 取消/退回任务调试信息 ===')
+    console.log('currentUserId:', currentUserId.value)
+    console.log('task.publisherId:', task.value?.publisherId)
+    console.log('task.runnerId:', task.value?.runnerId)
+    console.log('isPublisher:', isPublisher.value)
+    console.log('isRunner:', isRunner.value)
+    console.log('isRunnerCancel:', isRunnerCancel)
+    console.log('task.status:', task.value?.status)
+    console.log('===========================')
+    
+    const { value } = await ElMessageBox.prompt(
+      isRunnerCancel ? '请输入退回原因' : '请输入取消原因', 
+      isRunnerCancel ? '退回任务' : '取消任务',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '返回',
+        inputPlaceholder: isRunnerCancel ? '请输入退回原因...' : '请输入取消原因...',
+        inputValidator: (value: string) => {
+          if (!value || value.trim() === '') {
+            return isRunnerCancel ? '退回原因不能为空' : '取消原因不能为空'
+          }
+          return true
         }
-        return true
       }
-    })
+    )
 
+    // 跑腿员退回任务使用 action: 'return'，发布者取消使用 action: 'cancel'
+    const action = isRunnerCancel ? 'return' : 'cancel'
+    console.log('准备调用 action:', action)
+    
     await updateTaskStatus(task.value.id, {
-      action: 'cancel',
+      action: action,
       cancelReason: value
     })
-    ElMessage.success('任务已取消')
+    
+    ElMessage.success(isRunnerCancel ? '任务已退回' : '任务已取消')
     loadTaskDetail()
   } catch (error: any) {
     if (error !== 'cancel') {
-      console.error(error)
+      console.error('取消/退回任务失败:', error)
     }
   }
 }

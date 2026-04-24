@@ -63,9 +63,9 @@
             <el-icon><Star /></el-icon>
             <template #title>我的收藏</template>
           </el-menu-item>
-          <el-menu-item index="/payments">
-            <el-icon><Wallet /></el-icon>
-            <template #title>支付记录</template>
+          <el-menu-item index="/orders">
+            <el-icon><List /></el-icon>
+            <template #title>我的订单</template>
           </el-menu-item>
 
           <el-divider class="menu-divider" />
@@ -153,6 +153,7 @@ import {
   Document,
   Star,
   Wallet,
+  List,
   User,
   Setting,
   Fold,

@@ -153,12 +153,12 @@ const getCategoryName = (id: string) => {
 }
 
 const getStatusType = (status: number) => {
-  const types: Record<number, string> = { 0: 'info', 1: 'warning', 2: 'success', 3: 'danger' }
+  const types: Record<number, string> = { 0: 'info', 1: 'warning', 2: 'success', 3: 'danger', 4: 'warning' }
   return types[status] || 'info'
 }
 
 const getStatusText = (status: number) => {
-  const texts: Record<number, string> = { 0: '待接单', 1: '进行中', 2: '已完成', 3: '已取消' }
+  const texts: Record<number, string> = { 0: '待接单', 1: '进行中', 2: '已完成', 3: '已取消', 4: '已退回' }
   return texts[status] || '未知'
 }
 
