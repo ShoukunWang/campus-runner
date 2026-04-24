@@ -40,8 +40,8 @@
         >
           <el-form-item>
             <el-radio-group v-model="form.userType" size="large" class="user-type-group">
-              <el-radio-button label="user">用户登录</el-radio-button>
-              <el-radio-button label="admin">管理员登录</el-radio-button>
+              <el-radio-button value="user">用户登录</el-radio-button>
+              <el-radio-button value="admin">管理员登录</el-radio-button>
             </el-radio-group>
           </el-form-item>
 

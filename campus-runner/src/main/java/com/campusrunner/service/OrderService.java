@@ -3,12 +3,17 @@ package com.campusrunner.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.campusrunner.entity.Order;
+import com.campusrunner.entity.Task;
+
+import java.util.Map;
 
 public interface OrderService extends IService<Order> {
 
     /**
      * 任务完成时自动创建订单
      */
+    Order createOrderFromTask(Task task);
+
     Order createOrderFromTask(String taskId);
 
     /**
@@ -22,9 +27,14 @@ public interface OrderService extends IService<Order> {
     Order cancelOrder(String orderId, String userId, String reason);
 
     /**
-     * 退款订单
+     * 申请退款
      */
-    Order refundOrder(String orderId, String userId, String reason);
+    Order applyRefund(String orderId, String userId, String reason);
+
+    /**
+     * 审核退款
+     */
+    Order auditRefund(String orderId, String userId, Boolean agreed, String rejectReason);
 
     /**
      * 查询我的订单
@@ -39,5 +49,5 @@ public interface OrderService extends IService<Order> {
     /**
      * 订单统计
      */
-    java.util.Map<String, Object> getOrderStatistics(String userId);
+    Map<String, Object> getOrderStatistics(String userId);
 }

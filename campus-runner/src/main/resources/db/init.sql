@@ -90,7 +90,7 @@ CREATE TABLE `task` (
     `contact_name` VARCHAR(50) DEFAULT NULL COMMENT '联系人姓名',
     `contact_phone` VARCHAR(20) DEFAULT NULL COMMENT '联系人电话',
     `remarks` VARCHAR(500) DEFAULT NULL COMMENT '备注',
-    `status` TINYINT DEFAULT 0 COMMENT '任务状态：0-待接单，1-进行中，2-已完成，3-已取消（发布者取消），4-已退回（跑腿员退回）',
+    `status` TINYINT DEFAULT -1 COMMENT '任务状态：-1-待发布（草稿），0-待接取，1-进行中（已接单），2-已提货，3-待确认，4-已完成，5-已取消，6-已退回',
     `runner_id` VARCHAR(32) DEFAULT NULL COMMENT '接单跑腿员ID',
     `accept_time` DATETIME DEFAULT NULL COMMENT '接单时间',
     `pickup_time` DATETIME DEFAULT NULL COMMENT '取件时间', -- 新增字段
@@ -124,7 +124,7 @@ CREATE TABLE `task_order` (
     `publisher_id` VARCHAR(32) NOT NULL COMMENT '发布者ID（付款人）',
     `runner_id` VARCHAR(32) NOT NULL COMMENT '跑腿员ID（收款人）',
     `amount` DECIMAL(10,2) NOT NULL COMMENT '订单金额（元）',
-    `status` TINYINT DEFAULT 0 COMMENT '订单状态：0-待支付，1-已支付，2-已取消，3-已退款',
+    `status` TINYINT DEFAULT 0 COMMENT '订单状态：0-待支付，1-已支付，2-退款中，3-已退款，4-支付逾期（已扣信用分，仍可支付）',
     `pay_time` DATETIME DEFAULT NULL COMMENT '支付时间',
     `cancel_time` DATETIME DEFAULT NULL COMMENT '取消时间',
     `cancel_reason` VARCHAR(255) DEFAULT NULL COMMENT '取消原因',
@@ -186,20 +186,6 @@ CREATE TABLE `review` (
     KEY `idx_rating` (`rating`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='评价表';
 
--- 系统配置表
-CREATE TABLE `sys_config` (
-    `id` VARCHAR(32) NOT NULL,
-    `config_key` VARCHAR(100) NOT NULL COMMENT '配置键',
-    `config_value` VARCHAR(500) DEFAULT NULL COMMENT '配置值',
-    `description` VARCHAR(255) DEFAULT NULL COMMENT '配置说明',
-    `create_by` VARCHAR(32) DEFAULT NULL COMMENT '创建人',
-    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_by` VARCHAR(32) DEFAULT NULL COMMENT '更新人',
-    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `is_deleted` TINYINT DEFAULT 0 COMMENT '逻辑删除：0-未删除，1-已删除',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_config_key` (`config_key`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统配置表';
 
 -- 初始化管理员账号（密码：admin123）
 -- 使用 Hutool DigestUtil.bcrypt("admin123") 生成的哈希

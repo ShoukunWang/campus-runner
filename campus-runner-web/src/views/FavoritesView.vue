@@ -96,12 +96,21 @@ const loadFavorites = async () => {
 }
 
 const getStatusType = (status: number) => {
-  const types: Record<number, string> = { 0: 'info', 1: 'warning', 2: 'success', 3: 'danger' }
+  const types: Record<number, string> = { 0: 'info', 1: 'warning', 2: 'success', 3: 'danger', 4: 'warning', 5: 'primary' }
   return types[status] || 'info'
 }
 
 const getStatusText = (status: number) => {
-  const texts: Record<number, string> = { 0: '待接单', 1: '进行中', 2: '已完成', 3: '已取消' }
+  const texts: Record<number, string> = {
+    [-1]: '待发布',
+    0: '待接取',
+    1: '进行中',
+    2: '已提货',
+    3: '待确认',
+    4: '已完成',
+    5: '已取消',
+    6: '待接取'
+  }
   return texts[status] || '未知'
 }
 
