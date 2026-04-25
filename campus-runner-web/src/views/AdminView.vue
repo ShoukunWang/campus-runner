@@ -192,6 +192,25 @@
               <span>用户列表</span>
             </div>
           </template>
+          <div class="search-bar">
+            <el-form :inline="true" :model="userSearchForm">
+              <el-form-item label="搜索">
+                <el-input
+                  v-model="userSearchForm.keyword"
+                  placeholder="昵称/手机号"
+                  style="width: 200px"
+                  clearable
+                />
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" @click="handleUserSearch">
+                  <el-icon><Search /></el-icon>
+                  搜索
+                </el-button>
+                <el-button @click="handleUserSearchReset">重置</el-button>
+              </el-form-item>
+            </el-form>
+          </div>
           <el-table :data="userList" style="width: 100%" v-loading="userLoading">
             <el-table-column prop="username" label="用户名" width="120" />
             <el-table-column prop="nickname" label="昵称" width="120" />
@@ -240,6 +259,33 @@
           <template #header>
             <span>任务列表</span>
           </template>
+          <div class="search-bar">
+            <el-form :inline="true" :model="taskSearchForm">
+              <el-form-item label="任务编号">
+                <el-input
+                  v-model="taskSearchForm.taskNo"
+                  placeholder="请输入任务编号"
+                  style="width: 180px"
+                  clearable
+                />
+              </el-form-item>
+              <el-form-item label="任务标题">
+                <el-input
+                  v-model="taskSearchForm.title"
+                  placeholder="请输入任务标题"
+                  style="width: 180px"
+                  clearable
+                />
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" @click="handleTaskSearch">
+                  <el-icon><Search /></el-icon>
+                  搜索
+                </el-button>
+                <el-button @click="handleTaskSearchReset">重置</el-button>
+              </el-form-item>
+            </el-form>
+          </div>
           <el-table :data="taskList" style="width: 100%" v-loading="taskLoading">
             <el-table-column prop="taskNo" label="任务编号" width="150" />
             <el-table-column prop="title" label="任务标题" show-overflow-tooltip />
@@ -254,8 +300,15 @@
               </template>
             </el-table-column>
             <el-table-column prop="createTime" label="创建时间" width="180" />
-            <el-table-column label="操作" width="150" fixed="right" align="center">
+            <el-table-column label="操作" width="220" fixed="right" align="center">
               <template #default="scope">
+                <el-button
+                  size="small"
+                  @click="handleEditTaskStatus(scope.row)"
+                  :disabled="scope.row.status === 4 || scope.row.status === 5"
+                >
+                  修改状态
+                </el-button>
                 <el-button size="small" type="danger" @click="handleDeleteTask(scope.row)">删除</el-button>
               </template>
             </el-table-column>
@@ -283,6 +336,25 @@
               </el-button>
             </div>
           </template>
+          <div class="search-bar">
+            <el-form :inline="true" :model="adminSearchForm">
+              <el-form-item label="搜索">
+                <el-input
+                  v-model="adminSearchForm.keyword"
+                  placeholder="真实姓名/手机号"
+                  style="width: 200px"
+                  clearable
+                />
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" @click="handleAdminSearch">
+                  <el-icon><Search /></el-icon>
+                  搜索
+                </el-button>
+                <el-button @click="handleAdminSearchReset">重置</el-button>
+              </el-form-item>
+            </el-form>
+          </div>
           <el-table :data="adminList" style="width: 100%" v-loading="adminLoading">
             <el-table-column prop="username" label="用户名" width="150" />
             <el-table-column prop="realName" label="真实姓名" width="120" />
@@ -365,6 +437,45 @@
         <el-button type="primary" @click="saveAdmin">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 任务状态修改弹窗 -->
+    <el-dialog v-model="taskStatusDialogVisible" title="管理员干预 - 修改任务状态" width="500px">
+      <el-alert
+        title="注意：此操作将直接修改任务状态，可能影响用户权益，请谨慎操作！"
+        type="warning"
+        :closable="false"
+        style="margin-bottom: 20px"
+      />
+      <el-form :model="taskStatusForm" label-width="120px">
+        <el-form-item label="当前状态">
+          <el-tag :type="getTaskStatusType(taskStatusForm.currentStatus)">
+            {{ getTaskStatusText(taskStatusForm.currentStatus) }}
+          </el-tag>
+        </el-form-item>
+        <el-form-item label="修改为">
+          <el-select v-model="taskStatusForm.targetStatus" style="width: 100%" placeholder="请选择目标状态">
+            <el-option
+              v-for="item in availableStatusOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="干预原因">
+          <el-input
+            v-model="taskStatusForm.cancelReason"
+            type="textarea"
+            :rows="3"
+            placeholder="请详细说明进行状态干预的原因（必填）"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="taskStatusDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveTaskStatus">确认执行</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -374,7 +485,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   DataLine, User, List, Setting, Document, 
-  UserFilled, CircleCheck, Money, Plus
+  UserFilled, CircleCheck, Money, Plus, Search
 } from '@element-plus/icons-vue'
 import { 
   getStatistics, 
@@ -399,6 +510,9 @@ const userList = ref<any[]>([])
 const userTotal = ref(0)
 const userPageNum = ref(1)
 const userPageSize = ref(10)
+const userSearchForm = ref({
+  keyword: ''
+})
 
 // 任务管理
 const taskLoading = ref(false)
@@ -406,6 +520,10 @@ const taskList = ref<any[]>([])
 const taskTotal = ref(0)
 const taskPageNum = ref(1)
 const taskPageSize = ref(10)
+const taskSearchForm = ref({
+  taskNo: '',
+  title: ''
+})
 
 // 管理员管理
 const adminLoading = ref(false)
@@ -413,6 +531,9 @@ const adminList = ref<any[]>([])
 const adminTotal = ref(0)
 const adminPageNum = ref(1)
 const adminPageSize = ref(10)
+const adminSearchForm = ref({
+  keyword: ''
+})
 
 // 弹窗
 const userDialogVisible = ref(false)
@@ -432,6 +553,17 @@ const adminForm = ref({
   phone: '',
   role: 2
 })
+
+// 任务状态修改
+const taskStatusDialogVisible = ref(false)
+const taskStatusForm = ref({
+  id: '',
+  currentStatus: 0,
+  targetStatus: 0,
+  cancelReason: ''
+})
+
+const availableStatusOptions = ref<any[]>([])
 
 const dialogTitle = ref('')
 const isEdit = ref(false)
@@ -480,10 +612,11 @@ const loadStats = async () => {
 const loadUserList = async () => {
   userLoading.value = true
   try {
-    console.log('开始加载用户列表...')
+    console.log('开始加载用户列表，搜索条件:', userSearchForm.value)
     const res: any = await getUserList({
       pageNum: userPageNum.value,
-      pageSize: userPageSize.value
+      pageSize: userPageSize.value,
+      keyword: userSearchForm.value.keyword
     })
     console.log('用户列表响应:', res)
     userList.value = res.result.records || []
@@ -499,10 +632,12 @@ const loadUserList = async () => {
 const loadTaskList = async () => {
   taskLoading.value = true
   try {
-    console.log('开始加载任务列表...')
+    console.log('开始加载任务列表，搜索条件:', taskSearchForm.value)
     const res: any = await getAdminTaskList({
       pageNum: taskPageNum.value,
-      pageSize: taskPageSize.value
+      pageSize: taskPageSize.value,
+      taskNo: taskSearchForm.value.taskNo,
+      title: taskSearchForm.value.title
     })
     console.log('任务列表响应:', res)
     taskList.value = res.result.records || []
@@ -518,10 +653,11 @@ const loadTaskList = async () => {
 const loadAdminList = async () => {
   adminLoading.value = true
   try {
-    console.log('开始加载管理员列表...')
+    console.log('开始加载管理员列表，搜索条件:', adminSearchForm.value)
     const res: any = await getAdminList({
       pageNum: adminPageNum.value,
-      pageSize: adminPageSize.value
+      pageSize: adminPageSize.value,
+      keyword: adminSearchForm.value.keyword
     })
     console.log('管理员列表响应:', res)
     adminList.value = res.result.records || []
@@ -532,6 +668,40 @@ const loadAdminList = async () => {
   } finally {
     adminLoading.value = false
   }
+}
+
+const handleUserSearch = () => {
+  userPageNum.value = 1
+  loadUserList()
+}
+
+const handleUserSearchReset = () => {
+  userSearchForm.value.keyword = ''
+  userPageNum.value = 1
+  loadUserList()
+}
+
+const handleTaskSearch = () => {
+  taskPageNum.value = 1
+  loadTaskList()
+}
+
+const handleTaskSearchReset = () => {
+  taskSearchForm.value.taskNo = ''
+  taskSearchForm.value.title = ''
+  taskPageNum.value = 1
+  loadTaskList()
+}
+
+const handleAdminSearch = () => {
+  adminPageNum.value = 1
+  loadAdminList()
+}
+
+const handleAdminSearchReset = () => {
+  adminSearchForm.value.keyword = ''
+  adminPageNum.value = 1
+  loadAdminList()
 }
 
 // ==================== 用户操作 ====================
@@ -576,6 +746,62 @@ const saveUser = async () => {
 }
 
 // ==================== 任务操作 ====================
+const handleEditTaskStatus = (row: any) => {
+  taskStatusForm.value = {
+    id: row.id,
+    currentStatus: row.status,
+    targetStatus: row.status,
+    cancelReason: ''
+  }
+  
+  const options: any = {
+    '0': [{ value: 6, label: '已退回（强制下架）' }],
+    '1': [{ value: 6, label: '已退回（取消任务）' }],
+    '2': [{ value: 6, label: '已退回（取消任务）' }],
+    '3': [
+      { value: 4, label: '已完成（判定完成）' },
+      { value: 6, label: '已退回（判定退回）' }
+    ],
+    '6': [{ value: 0, label: '待接取（重新上架）' }]
+  }
+  
+  availableStatusOptions.value = options[String(row.status)] || []
+  taskStatusDialogVisible.value = true
+}
+
+const saveTaskStatus = async () => {
+  if (!taskStatusForm.value.cancelReason.trim()) {
+    ElMessage.warning('请填写干预原因')
+    return
+  }
+  
+  try {
+    await ElMessageBox.confirm(
+      `确定将任务状态从「${getTaskStatusText(taskStatusForm.value.currentStatus)}」改为「${getTaskStatusText(taskStatusForm.value.targetStatus)}」吗？`,
+      '管理员干预确认',
+      {
+        confirmButtonText: '确定执行',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    await updateAdminTask(taskStatusForm.value.id, {
+      status: taskStatusForm.value.targetStatus,
+      cancelReason: `【管理员干预】${taskStatusForm.value.cancelReason}`
+    })
+    
+    ElMessage.success('状态修改成功')
+    taskStatusDialogVisible.value = false
+    loadTaskList()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error(error)
+      ElMessage.error('修改失败')
+    }
+  }
+}
+
 const handleDeleteTask = async (row: any) => {
   try {
     await ElMessageBox.confirm('确定要删除该任务吗？', '提示', {
@@ -784,6 +1010,22 @@ onMounted(() => {
     display: flex;
     justify-content: space-between;
     align-items: center;
+  }
+
+  .search-bar {
+    padding: 10px 0;
+    background: #f5f7fa;
+    padding: 15px 20px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+
+    .el-form {
+      margin-bottom: 0;
+    }
+
+    .el-form-item {
+      margin-bottom: 0;
+    }
   }
 
   .h-420 {

@@ -186,11 +186,11 @@ public class AdminServiceImpl extends ServiceImpl<AdminMapper, Admin> implements
             task.setReward(reward);
         }
         if (status != null) {
-            if (status == 3 && StrUtil.isBlank(cancelReason)) {
-                throw new RuntimeException("取消任务请填写原因");
+            if ((status == 5 || status == 6) && StrUtil.isBlank(cancelReason)) {
+                throw new RuntimeException("取消或退回任务请填写原因");
             }
             task.setStatus(status);
-            if (status == 3) {
+            if (StrUtil.isNotBlank(cancelReason)) {
                 task.setCancelReason(cancelReason);
             }
         }
