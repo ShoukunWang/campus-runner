@@ -120,7 +120,7 @@ router.beforeEach((to, from) => {
     return '/tasks'
   }
 
-  // 游客页面但已登录
+    // 游客页面但已登录
   if (to.meta.guest && userStore.isLoggedIn) {
     // 管理员登录后跳转到管理员后台，普通用户跳转到首页
     if (userRole === 'admin') {

@@ -158,6 +158,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { getOrderDetail, payOrder, applyRefund, auditRefund } from '@/api/order'
+import { submitReview as submitReviewApi } from '@/api/review'
 
 const route = useRoute()
 const router = useRouter()
@@ -280,9 +281,20 @@ const handleAuditRefund = async (agreed: boolean) => {
 }
 
 const submitReview = async () => {
-  ElMessage.success('评价提交成功')
-  showReviewDialog.value = false
-  order.value.isReviewed = true
+  try {
+    await submitReviewApi({
+      taskId: order.value.taskId,
+      rating: reviewForm.value.rating,
+      content: reviewForm.value.content,
+      tags: [],
+      isAnonymous: false
+    })
+    ElMessage.success('评价提交成功')
+    showReviewDialog.value = false
+    order.value.isReviewed = true
+  } catch (error: any) {
+    ElMessage.error(error.message || '评价提交失败')
+  }
 }
 
 onMounted(() => {

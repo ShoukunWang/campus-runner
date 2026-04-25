@@ -175,16 +175,6 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
             throw new RuntimeException("任务不存在");
         }
         
-        System.out.println("========== updateTaskStatus 调试信息 ==========");
-        System.out.println("taskId: " + taskId);
-        System.out.println("action: " + action);
-        System.out.println("cancelReason: " + cancelReason);
-        System.out.println("operatorId: " + operatorId);
-        System.out.println("task.status: " + task.getStatus());
-        System.out.println("task.runnerId: " + task.getRunnerId());
-        System.out.println("task.publisherId: " + task.getPublisherId());
-        System.out.println("================================================");
-        
         LocalDateTime now = LocalDateTime.now();
         
         switch (action) {
@@ -274,7 +264,10 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
                     orderService.createOrderFromTask(task);
                 } catch (Exception e) {
                     System.err.println("[严重] 订单创建失败，任务ID: " + taskId + ", 错误: " + e.getMessage());
-                    e.printStackTrace();
+                    task.setStatus(3);
+                    task.setCompleteTime(null);
+                    baseMapper.updateById(task);
+                    throw new RuntimeException("订单创建失败，任务已回退到待确认状态", e);
                 }
                 
                 // 返回最新的任务信息

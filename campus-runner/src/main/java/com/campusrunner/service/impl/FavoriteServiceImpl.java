@@ -24,29 +24,31 @@ public class FavoriteServiceImpl extends ServiceImpl<FavoriteMapper, Favorite> i
     @Override
     @Transactional
     public Map<String, Object> toggleFavorite(String userId, String taskId) {
-        Favorite existingFavorite = baseMapper.selectByUserAndTask(userId, taskId);
-        Map<String, Object> result = new HashMap<>();
+        synchronized (this) {
+            Favorite existingFavorite = baseMapper.selectByUserAndTask(userId, taskId);
+            Map<String, Object> result = new HashMap<>();
 
-        if (existingFavorite != null) {
-            baseMapper.deleteById(existingFavorite.getId());
-            taskMapper.updateFavoriteCount(taskId, -1);
-            result.put("isFavorite", false);
-        } else {
-            Favorite favorite = new Favorite();
-            favorite.setUserId(userId);
-            favorite.setTaskId(taskId);
-            favorite.setCreateTime(LocalDateTime.now());
-            favorite.setUpdateTime(LocalDateTime.now());
-            baseMapper.insert(favorite);
-            taskMapper.updateFavoriteCount(taskId, 1);
-            result.put("isFavorite", true);
+            if (existingFavorite != null) {
+                baseMapper.deleteById(existingFavorite.getId());
+                taskMapper.updateFavoriteCount(taskId, -1);
+                result.put("isFavorite", false);
+            } else {
+                Favorite favorite = new Favorite();
+                favorite.setUserId(userId);
+                favorite.setTaskId(taskId);
+                favorite.setCreateTime(LocalDateTime.now());
+                favorite.setUpdateTime(LocalDateTime.now());
+                baseMapper.insert(favorite);
+                taskMapper.updateFavoriteCount(taskId, 1);
+                result.put("isFavorite", true);
+            }
+
+            int favoriteCount = baseMapper.countByTaskId(taskId);
+            result.put("taskId", taskId);
+            result.put("favoriteCount", favoriteCount);
+
+            return result;
         }
-
-        int favoriteCount = baseMapper.countByTaskId(taskId);
-        result.put("taskId", taskId);
-        result.put("favoriteCount", favoriteCount);
-
-        return result;
     }
 
     @Override

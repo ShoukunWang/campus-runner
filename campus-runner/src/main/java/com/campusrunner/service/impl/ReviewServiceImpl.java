@@ -39,7 +39,7 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewMapper, Review> impleme
             throw new RuntimeException("任务不存在");
         }
 
-        if (task.getStatus() != 2) {
+        if (task.getStatus() != 4) {
             throw new RuntimeException("任务未完成，暂不能评价");
         }
 
@@ -81,34 +81,36 @@ public class ReviewServiceImpl extends ServiceImpl<ReviewMapper, Review> impleme
     }
 
     private void updateUserCreditScore(String userId, Integer rating) {
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            return;
-        }
+        synchronized (ReviewServiceImpl.class) {
+            User user = userMapper.selectById(userId);
+            if (user == null) {
+                return;
+            }
 
-        int scoreChange = 0;
-        switch (rating) {
-            case 5:
-                scoreChange = 5;
-                break;
-            case 4:
-                scoreChange = 3;
-                break;
-            case 3:
-                scoreChange = 1;
-                break;
-            case 2:
-                scoreChange = -2;
-                break;
-            case 1:
-                scoreChange = -5;
-                break;
-        }
+            int scoreChange = 0;
+            switch (rating) {
+                case 5:
+                    scoreChange = 5;
+                    break;
+                case 4:
+                    scoreChange = 3;
+                    break;
+                case 3:
+                    scoreChange = 1;
+                    break;
+                case 2:
+                    scoreChange = -2;
+                    break;
+                case 1:
+                    scoreChange = -5;
+                    break;
+            }
 
-        int newScore = user.getCreditScore() + scoreChange;
-        user.setCreditScore(Math.max(0, Math.min(100, newScore)));
-        user.setUpdateTime(LocalDateTime.now());
-        userMapper.updateById(user);
+            int newScore = user.getCreditScore() + scoreChange;
+            user.setCreditScore(Math.max(0, Math.min(100, newScore)));
+            user.setUpdateTime(LocalDateTime.now());
+            userMapper.updateById(user);
+        }
     }
 
     @Override
