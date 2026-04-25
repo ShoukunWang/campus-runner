@@ -84,8 +84,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
-import { publishTask } from '@/api/task'
-import { getCategoryList } from '@/api/task'
+import { publishTask, getCategoryList } from '@/api/task'
 
 const router = useRouter()
 const formRef = ref()

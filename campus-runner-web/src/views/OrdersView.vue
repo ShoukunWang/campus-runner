@@ -48,7 +48,7 @@
       </div>
 
       <!-- 订单列表 -->
-      <el-table :data="orders" v-loading="loading" style="width: 100%" @row-click="(row) => viewOrderDetail(row.id)">
+      <el-table :data="orders" v-loading="loading" style="width: 100%" @row-click="(row: any) => viewOrderDetail(row.id)">
         <el-table-column prop="orderNo" label="订单编号" width="200">
           <template #default="{ row }">
             <el-link type="primary" @click.stop="viewOrderDetail(row.id)">
@@ -219,8 +219,8 @@ const loadOrders = async () => {
       pageNum: pageNum.value,
       pageSize: pageSize.value
     })
-    orders.value = res.result.records
-    total.value = res.result.total
+    orders.value = res.result?.records || []
+    total.value = res.result?.total || 0
   } catch (error) {
     ElMessage.error('加载订单列表失败')
   } finally {
@@ -231,7 +231,7 @@ const loadOrders = async () => {
 const loadStatistics = async () => {
   try {
     const res: any = await getOrderStatistics()
-    statistics.value = res.result
+    statistics.value = res.result || null
   } catch (error) {
     console.error('加载统计数据失败', error)
   }

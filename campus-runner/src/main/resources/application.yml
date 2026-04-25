@@ -7,9 +7,9 @@ spring:
   application:
     name: campus-runner
   datasource:
-    url: jdbc:mysql://localhost:3306/campus_runner?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
-    username: root
-    password: root
+    url: jdbc:mysql://localhost:3306/campus_runner?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=true&requireSSL=false
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       minimum-idle: 5
@@ -24,7 +24,7 @@ mybatis-plus:
   type-aliases-package: com.campusrunner.entity
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    # log-impl 移除：生产环境禁止打印SQL日志
   global-config:
     db-config:
       id-type: assign_uuid
@@ -34,7 +34,8 @@ mybatis-plus:
 
 # JWT配置
 jwt:
-  secret: campusRunnerSecretKey2025ForGraduationProject
+  secret: ${JWT_SECRET:campusRunnerSecretKey2025ForGraduationProject}
+  # 生产环境请通过 JWT_SECRET 环境变量设置高强度密钥
   expiration: 604800000  # 7天，单位毫秒
   header: Authorization
   token-prefix: Bearer

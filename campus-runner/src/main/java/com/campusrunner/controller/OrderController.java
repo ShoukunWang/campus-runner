@@ -117,10 +117,14 @@ public class OrderController {
      * 查询订单详情
      */
     @GetMapping("/{orderId}")
-    public Result<Order> getOrderDetail(@PathVariable String orderId) {
+    public Result<Order> getOrderDetail(@PathVariable String orderId, HttpServletRequest request) {
+        String userId = (String) request.getAttribute("userId");
         Order order = orderService.getById(orderId);
         if (order == null) {
             return Result.error(7006, "订单不存在");
+        }
+        if (!userId.equals(order.getPublisherId()) && !userId.equals(order.getRunnerId())) {
+            return Result.error(403, "无权查看该订单");
         }
         return Result.success(order);
     }

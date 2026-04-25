@@ -45,15 +45,8 @@ public class AdminServiceImpl extends ServiceImpl<AdminMapper, Admin> implements
             throw new RuntimeException("账号或密码错误");
         }
 
-        // 临时修复：如果密码不匹配，尝试使用明文比较并更新密码
         if (!DigestUtil.bcryptCheck(password, admin.getPassword())) {
-            // 如果是默认密码，自动修复
-            if ("admin123".equals(password)) {
-                admin.setPassword(DigestUtil.bcrypt(password));
-                baseMapper.updateById(admin);
-            } else {
-                throw new RuntimeException("账号或密码错误");
-            }
+            throw new RuntimeException("账号或密码错误");
         }
 
         if (admin.getStatus() == 0) {

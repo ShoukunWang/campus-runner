@@ -54,7 +54,7 @@ export const acceptTask = (taskId: string) => {
 
 // 更新任务状态
 export const updateTaskStatus = (taskId: string, data: {
-  action: 'pickup' | 'deliver' | 'cancel' | 'return'
+  action: 'pickup' | 'deliver' | 'cancel' | 'return' | 'confirm' | 'cancelPublish' | 'publish'
   cancelReason?: string
 }) => {
   return request.put(`/task/status/${taskId}`, data)

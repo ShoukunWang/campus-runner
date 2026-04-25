@@ -4,7 +4,7 @@ import router from '@/router'
 
 // 创建axios实例
 const request = axios.create({
-  baseURL: 'http://localhost:8080/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'
@@ -67,11 +67,8 @@ request.interceptors.response.use(
       return Promise.reject(error)
     }
     
-    // 处理网络错误（后端未启动或连接失败）
-    ElMessage.error('网络错误，请检查后端服务是否启动')
-    localStorage.removeItem('token')
-    localStorage.removeItem('userInfo')
-    router.push('/login')
+    // 网络错误，仅提示不强制登出
+    ElMessage.error('网络连接失败，请检查网络后刷新页面')
     return Promise.reject(error)
   }
 )

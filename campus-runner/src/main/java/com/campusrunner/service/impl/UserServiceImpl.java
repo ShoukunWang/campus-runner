@@ -72,15 +72,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new RuntimeException("用户名或密码错误");
         }
 
-        // 临时修复：如果密码不匹配，尝试使用明文比较并更新密码
         if (!DigestUtil.bcryptCheck(password, user.getPassword())) {
-            // 如果是常见密码，自动修复
-            if ("123456".equals(password) || "test123".equals(password)) {
-                user.setPassword(DigestUtil.bcrypt(password));
-                baseMapper.updateById(user);
-            } else {
-                throw new RuntimeException("用户名或密码错误");
-            }
+            throw new RuntimeException("用户名或密码错误");
         }
 
         if (user.getStatus() == 0) {

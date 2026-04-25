@@ -78,6 +78,13 @@ public class ScheduleTask {
                     userMapper.updateById(runner);
                 }
                 
+                // 更新发布者统计
+                User publisher = userMapper.selectById(task.getPublisherId());
+                if (publisher != null) {
+                    publisher.setTotalTasks(publisher.getTotalTasks() + 1);
+                    userMapper.updateById(publisher);
+                }
+                
                 // 3. 创建订单（直接传内存对象，避免缓存问题）
                 orderService.createOrderFromTask(task);
                 

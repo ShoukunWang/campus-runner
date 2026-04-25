@@ -32,7 +32,7 @@
             <template #title>任务管理</template>
           </el-menu-item>
           <el-menu-item index="/admin/admins">
-            <el-icon><Document /></el-icon>
+            <el-icon><Setting /></el-icon>
             <template #title>管理员管理</template>
           </el-menu-item>
 
@@ -78,8 +78,8 @@
           <!-- 管理员专用入口 -->
           <template v-if="isAdmin">
             <el-menu-item index="/admin">
-              <el-icon><Setting /></el-icon>
-              <template #title>管理员后台</template>
+            <el-icon><Setting /></el-icon>
+            <template #title>管理员后台</template>
             </el-menu-item>
           </template>
         </template>

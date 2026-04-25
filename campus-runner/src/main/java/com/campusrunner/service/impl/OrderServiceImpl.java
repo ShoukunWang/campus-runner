@@ -9,6 +9,7 @@ import com.campusrunner.entity.Task;
 import com.campusrunner.mapper.OrderMapper;
 import com.campusrunner.mapper.TaskMapper;
 import com.campusrunner.service.OrderService;
+import com.campusrunner.utils.SnowflakeIdUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
     @Autowired
     private TaskMapper taskMapper;
+
+    @Autowired
+    private SnowflakeIdUtil snowflakeIdUtil;
 
     @Override
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
@@ -124,7 +128,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         // ========================================================
         
         // 校验权限：只有跑腿员可以取消订单（发布者不能取消！）
-        if (!order.getRunnerId().equals(userId)) {
+        if (!userId.equals(order.getRunnerId())) {
             throw new RuntimeException("只有跑腿员可以取消订单。若有争议请联系平台客服仲裁");
         }
 
@@ -243,6 +247,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         stats.put("incomeCount", incomeCount);
 
         // 使用SQL聚合函数计算总收入
+        // TODO: 应使用 SQL SUM 聚合避免全量加载到内存，当前数据量较小暂不优化
         List<Order> incomeOrders = baseMapper.selectList(incomeWrapper);
         BigDecimal incomeAmount = incomeOrders.stream()
             .map(Order::getAmount)
@@ -283,15 +288,13 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
      * 生成订单编号
      */
     private String generateOrderNo() {
-        return "ORD" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) +
-               String.format("%04d", (int)(Math.random() * 10000));
+        return "ORD" + snowflakeIdUtil.nextId();
     }
 
     /**
      * 生成支付流水号
      */
     private String generatePaymentNo() {
-        return "PAY" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) +
-               String.format("%04d", (int)(Math.random() * 10000));
+        return "PAY" + snowflakeIdUtil.nextId();
     }
 }

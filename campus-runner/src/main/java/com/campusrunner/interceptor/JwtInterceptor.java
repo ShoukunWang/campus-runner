@@ -70,7 +70,6 @@ public class JwtInterceptor implements HandlerInterceptor {
                uri.startsWith("/api/user/login") ||
                uri.startsWith("/api/admin/login") ||
                uri.startsWith("/api/category/list") ||
-               uri.startsWith("/api/task/list") ||
-               uri.startsWith("/api/task/detail");
+               uri.startsWith("/api/task/list");
     }
 }

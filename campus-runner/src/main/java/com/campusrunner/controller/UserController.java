@@ -66,6 +66,9 @@ public class UserController {
     @PutMapping("/profile")
     public Result<User> updateProfile(@RequestBody Map<String, Object> params, HttpServletRequest request) {
         String userId = (String) request.getAttribute("userId");
+        if (userId == null) {
+            return Result.error(401, "未登录或登录已过期");
+        }
         String nickname = (String) params.get("nickname");
         String avatar = (String) params.get("avatar");
         String email = (String) params.get("email");

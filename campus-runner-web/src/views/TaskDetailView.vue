@@ -221,7 +221,7 @@
             </el-button>
 
             <el-button
-              v-if="task.status === 2"
+              v-if="task.status === 4"
               type="success"
               size="large"
               disabled
@@ -408,11 +408,11 @@ const loadTaskDetail = async () => {
     // 获取当前用户ID
     currentUserId.value = userStore.userInfo?.id || ''
     // 加载收藏状态
-    checkFavoriteStatus()
+    await checkFavoriteStatus()
     // 加载评价列表
-    loadReviews()
+    await loadReviews()
     // 加载订单状态，判断是否已支付
-    loadOrderStatus()
+    await loadOrderStatus()
   } catch (error) {
     console.error(error)
   } finally {
@@ -422,8 +422,8 @@ const loadTaskDetail = async () => {
 
 const loadOrderStatus = async () => {
   try {
-    // 只有已完成的任务才有订单
-    if (task.value.status === 2) {
+    // 只有已完成(status=4)的任务才有订单
+    if (task.value.status === 4) {
       const res: any = await getOrderByTask(task.value.id)
       if (res.result) {
         // 订单状态：0-待支付，1-已支付，2-已取消，3-已退款
@@ -624,16 +624,6 @@ const handleCancel = async () => {
     // 判断是发布者还是跑腿员
     const isRunnerCancel = isRunner.value
     
-    console.log('=== 取消/退回任务调试信息 ===')
-    console.log('currentUserId:', currentUserId.value)
-    console.log('task.publisherId:', task.value?.publisherId)
-    console.log('task.runnerId:', task.value?.runnerId)
-    console.log('isPublisher:', isPublisher.value)
-    console.log('isRunner:', isRunner.value)
-    console.log('isRunnerCancel:', isRunnerCancel)
-    console.log('task.status:', task.value?.status)
-    console.log('===========================')
-    
     const { value } = await ElMessageBox.prompt(
       isRunnerCancel ? '请输入退回原因' : '请输入取消原因', 
       isRunnerCancel ? '退回任务' : '取消任务',
@@ -652,7 +642,6 @@ const handleCancel = async () => {
 
     // 跑腿员退回任务使用 action: 'return'，发布者取消使用 action: 'cancel'
     const action = isRunnerCancel ? 'return' : 'cancel'
-    console.log('准备调用 action:', action)
     
     await updateTaskStatus(task.value.id, {
       action: action,
