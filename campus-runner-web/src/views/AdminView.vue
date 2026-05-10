@@ -483,10 +483,14 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+
+// 从 Element Plus 的图标库 @element-plus/icons-vue 中导入的图标组件
 import { 
   DataLine, User, List, Setting, Document, 
   UserFilled, CircleCheck, Money, Plus, Search
 } from '@element-plus/icons-vue'
+
+// 导入 API 函数
 import { 
   getStatistics, 
   getUserList, 
