@@ -22,6 +22,9 @@ target/
 # Qoder AI 插件项目本地配置、缓存、索引
 .qoder/
 
+# TRAE AI 插件项目本地配置、缓存、索引
+.trae/
+
 # Fast Request 接口调试插件本地接口、环境、Token缓存
 .fastRequest/
 
