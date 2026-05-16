@@ -3,6 +3,7 @@ package com.campusrunner.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.campusrunner.entity.Admin;
+import com.campusrunner.entity.Appeal;
 import com.campusrunner.entity.Task;
 import com.campusrunner.entity.User;
 
@@ -36,4 +37,10 @@ public interface AdminService extends IService<Admin> {
     Admin addAdmin(String username, String password, String realName, String phone, String email, Integer role, String createBy);
 
     Admin updateAdmin(String adminId, String realName, String phone, String email, Integer role, Integer status);
+
+    Page<Appeal> getAppealList(Integer pageNum, Integer pageSize, Integer status);
+
+    Appeal auditAppeal(String appealId, String adminId, Integer status, String remark);
+
+    Map<String, Object> getCompensationPool();
 }

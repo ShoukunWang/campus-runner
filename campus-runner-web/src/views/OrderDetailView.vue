@@ -74,6 +74,16 @@
             >
               评价跑腿员
             </el-button>
+
+            <!-- 已完成/已支付：申诉 -->
+            <el-button
+              v-if="canAppeal"
+              type="warning"
+              size="large"
+              @click="openAppealDialog"
+            >
+              我要申诉
+            </el-button>
           </template>
 
           <!-- 跑腿员操作 -->
@@ -149,16 +159,44 @@
         <el-button type="primary" @click="submitReview">提交评价</el-button>
       </template>
     </el-dialog>
+
+    <!-- 申诉对话框 -->
+    <el-dialog v-model="appealDialogVisible" title="发起申诉" width="500px">
+      <el-form :model="appealForm" label-width="100px">
+        <el-form-item label="申诉类型">
+          <el-select v-model="appealForm.appealType" placeholder="请选择申诉类型" style="width: 100%">
+            <el-option label="拒不支付" :value="1" />
+            <el-option label="虚假送达" :value="2" />
+            <el-option label="恶意退款" :value="3" />
+            <el-option label="物品损坏/丢失" :value="4" />
+            <el-option label="虚假确认" :value="5" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="申诉说明">
+          <el-input
+            v-model="appealForm.evidence"
+            type="textarea"
+            :rows="4"
+            placeholder="请详细描述情况并提供证据..."
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="appealDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitAppeal">提交申诉</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { getOrderDetail, payOrder, applyRefund, auditRefund } from '@/api/order'
 import { submitReview as submitReviewApi } from '@/api/review'
+import { createAppeal } from '@/api/appeal'
 
 const route = useRoute()
 const router = useRouter()
@@ -176,6 +214,22 @@ const showReviewDialog = ref(false)
 const reviewForm = ref({
   rating: 5,
   content: ''
+})
+
+const appealDialogVisible = ref(false)
+const appealForm = ref({
+  appealType: 1,
+  evidence: ''
+})
+
+const canAppeal = computed(() => {
+  if (!order.value) return false
+  if (order.value.status !== 1 && order.value.status !== 4) return false
+  const completeTime = order.value.completeTime || order.value.payTime
+  if (!completeTime) return false
+  const sevenDays = 7 * 24 * 60 * 60 * 1000
+  const diff = Date.now() - new Date(completeTime).getTime()
+  return diff <= sevenDays
 })
 
 const loadOrderDetail = async () => {
@@ -294,6 +348,29 @@ const submitReview = async () => {
     order.value.isReviewed = true
   } catch (error: any) {
     ElMessage.error(error.message || '评价提交失败')
+  }
+}
+
+const openAppealDialog = () => {
+  appealForm.value = { appealType: 1, evidence: '' }
+  appealDialogVisible.value = true
+}
+
+const submitAppeal = async () => {
+  if (!appealForm.value.evidence) {
+    ElMessage.warning('请填写申诉说明')
+    return
+  }
+  try {
+    await createAppeal({
+      orderId: order.value.id,
+      appealType: appealForm.value.appealType,
+      evidence: appealForm.value.evidence
+    })
+    ElMessage.success('申诉已提交，请等待管理员审核')
+    appealDialogVisible.value = false
+  } catch (error: any) {
+    ElMessage.error(error.message || '申诉提交失败')
   }
 }
 

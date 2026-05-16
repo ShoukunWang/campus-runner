@@ -6,12 +6,17 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.campusrunner.entity.Admin;
+import com.campusrunner.entity.Appeal;
+import com.campusrunner.entity.CompensationPool;
 import com.campusrunner.entity.Task;
 import com.campusrunner.entity.User;
 import com.campusrunner.mapper.AdminMapper;
+import com.campusrunner.mapper.AppealMapper;
+import com.campusrunner.mapper.CompensationPoolMapper;
 import com.campusrunner.mapper.TaskMapper;
 import com.campusrunner.mapper.UserMapper;
 import com.campusrunner.service.AdminService;
+import com.campusrunner.service.CreditService;
 import com.campusrunner.utils.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -36,6 +41,15 @@ public class AdminServiceImpl extends ServiceImpl<AdminMapper, Admin> implements
 
     @Autowired
     private TaskMapper taskMapper;
+
+    @Autowired
+    private AppealMapper appealMapper;
+
+    @Autowired
+    private CompensationPoolMapper compensationPoolMapper;
+
+    @Autowired
+    private CreditService creditService;
 
     @Override
     public Map<String, Object> login(String username, String password) {
@@ -351,5 +365,92 @@ public class AdminServiceImpl extends ServiceImpl<AdminMapper, Admin> implements
         baseMapper.updateById(admin);
         admin.setPassword(null);
         return admin;
+    }
+
+    @Override
+    public Page<Appeal> getAppealList(Integer pageNum, Integer pageSize, Integer status) {
+        Page<Appeal> page = new Page<>(pageNum, pageSize);
+        LambdaQueryWrapper<Appeal> wrapper = new LambdaQueryWrapper<>();
+        
+        if (status != null) {
+            wrapper.eq(Appeal::getStatus, status);
+        }
+        
+        wrapper.orderByDesc(Appeal::getCreateTime);
+        return appealMapper.selectPage(page, wrapper);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Appeal auditAppeal(String appealId, String adminId, Integer status, String remark) {
+        Appeal appeal = appealMapper.selectById(appealId);
+        if (appeal == null) {
+            throw new RuntimeException("申诉不存在");
+        }
+        
+        if (appeal.getStatus() != 0) {
+            throw new RuntimeException("申诉已处理");
+        }
+        
+        appeal.setStatus(status);
+        appeal.setAdminId(adminId);
+        appeal.setAuditRemark(remark);
+        appeal.setUpdateTime(LocalDateTime.now());
+        
+        if (status == 1) {
+            int deductAmount = 0;
+            String reason = "";
+            
+            switch (appeal.getAppealType()) {
+                case 1:
+                    deductAmount = 15;
+                    reason = "拒不支付";
+                    break;
+                case 2:
+                    deductAmount = 20;
+                    reason = "虚假送达";
+                    break;
+                case 3:
+                    deductAmount = 10;
+                    reason = "恶意退款";
+                    break;
+                case 4:
+                    deductAmount = 20;
+                    reason = "物品损坏/丢失";
+                    break;
+                case 5:
+                    deductAmount = 15;
+                    reason = "虚假确认";
+                    break;
+            }
+            
+            creditService.deductScore(appeal.getRespondentId(), deductAmount, reason, appeal.getOrderId(), appeal.getTaskId());
+            
+            BigDecimal compensationAmount = appeal.getCompensationAmount();
+            if (compensationAmount != null && compensationAmount.compareTo(BigDecimal.ZERO) > 0) {
+                creditService.deductFromCompensationPool(compensationAmount);
+            }
+        }
+        
+        appealMapper.updateById(appeal);
+        return appeal;
+    }
+
+    @Override
+    public Map<String, Object> getCompensationPool() {
+        CompensationPool pool = compensationPoolMapper.selectById("1");
+        Map<String, Object> result = new HashMap<>();
+        
+        if (pool != null) {
+            result.put("balance", pool.getBalance());
+            result.put("totalIncome", pool.getTotalIncome());
+            result.put("totalExpense", pool.getTotalExpense());
+        } else {
+            result.put("balance", BigDecimal.ZERO);
+            result.put("totalIncome", BigDecimal.ZERO);
+            result.put("totalExpense", BigDecimal.ZERO);
+        }
+        
+        return result;
     }
 }

@@ -8,6 +8,7 @@ import com.campusrunner.entity.Task;
 import com.campusrunner.entity.User;
 import com.campusrunner.mapper.TaskMapper;
 import com.campusrunner.mapper.UserMapper;
+import com.campusrunner.service.CreditService;
 import com.campusrunner.service.OrderService;
 import com.campusrunner.service.TaskService;
 import com.campusrunner.utils.SnowflakeIdUtil;
@@ -36,6 +37,9 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
 
     @Autowired
     private OrderService orderService;
+
+    @Autowired
+    private CreditService creditService;
 
     @Override
     public Page<Task> getTaskList(Integer pageNum, Integer pageSize, String categoryId, Integer taskType,
@@ -102,6 +106,15 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
                            String deliveryAddress, BigDecimal deliveryLongitude, BigDecimal deliveryLatitude,
                            BigDecimal reward, BigDecimal weight, String expectCompleteTime,
                            String contactName, String contactPhone, String remarks) {
+        User publisher = userMapper.selectById(publisherId);
+        if (publisher == null) {
+            throw new RuntimeException("用户不存在");
+        }
+        
+        if (!creditService.canPublishTask(publisher.getCreditScore())) {
+            throw new RuntimeException("信誉分过低，无法发布任务");
+        }
+
         Task task = new Task();
         task.setTaskNo(snowflakeIdUtil.generateTaskNo());
         task.setPublisherId(publisherId);
@@ -152,6 +165,15 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         }
         if (task.getPublisherId().equals(runnerId)) {
             throw new RuntimeException("不能接自己发布的任务");
+        }
+        
+        User runner = userMapper.selectById(runnerId);
+        if (runner == null) {
+            throw new RuntimeException("用户不存在");
+        }
+        
+        if (!creditService.canAcceptTask(runner.getCreditScore())) {
+            throw new RuntimeException("信誉分过低，无法接单");
         }
         
         task.setRunnerId(runnerId);

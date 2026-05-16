@@ -96,6 +96,13 @@
 
     <!-- 主内容区 -->
     <el-container class="main-container">
+      <!-- 信誉分警告条 -->
+      <div class="credit-warning-bar" v-if="showCreditWarning" @click="goToCreditScore">
+        <el-icon><Warning /></el-icon>
+        <span>您的信誉分为 {{ userStore.userInfo?.creditScore }}，{{ creditWarningText }}</span>
+        <span class="link">点击查看详情 <el-icon><ArrowRight /></el-icon></span>
+      </div>
+
       <!-- 顶部导航 -->
       <el-header class="header" height="60px">
         <div class="header-left">
@@ -159,11 +166,13 @@ import {
   Fold,
   Expand,
   ArrowDown,
+  ArrowRight,
   SwitchButton,
   Box,
   DataLine,
   UserFilled,
-  Van
+  Van,
+  Warning
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 
@@ -208,6 +217,23 @@ const menuActiveColor = computed(() => {
 
 // 当前激活的菜单
 const activeMenu = computed(() => route.path)
+
+// 信誉分警告
+const showCreditWarning = computed(() => {
+  if (isAdminRoute.value) return false
+  const score = userStore.userInfo?.creditScore
+  return score !== undefined && score < 80 && score >= 60
+})
+
+const creditWarningText = computed(() => {
+  const score = userStore.userInfo?.creditScore || 0
+  if (score >= 60) return '信誉分偏低，部分功能可能受限'
+  return ''
+})
+
+const goToCreditScore = () => {
+  router.push('/credit-score')
+}
 
 // 切换侧边栏折叠
 const toggleCollapse = () => {
@@ -353,6 +379,43 @@ const handleLogout = async () => {
   background-color: #f0f2f5;
   display: flex;
   flex-direction: column;
+}
+
+.credit-warning-bar {
+  background-color: #fdf6ec;
+  border-bottom: 1px solid #f5dab1;
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+
+  &:hover {
+    background-color: #fcebd8;
+  }
+
+  .el-icon {
+    color: #e6a23c;
+  }
+
+  span {
+    color: #909399;
+    font-size: 14px;
+  }
+
+  .link {
+    color: #409eff;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 16px;
+
+    .el-icon {
+      color: #409eff;
+    }
+  }
 }
 
 .header {

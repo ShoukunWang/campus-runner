@@ -201,9 +201,61 @@ INSERT INTO `task_category` (`id`, `name`, `sort_order`, `status`) VALUES
 ('4', '文件传递', 4, 1),
 ('5', '其他', 5, 1);
 
+-- 信誉分变动记录表
+CREATE TABLE `credit_record` (
+    `id` VARCHAR(32) NOT NULL,
+    `user_id` VARCHAR(32) NOT NULL COMMENT '用户ID',
+    `change_amount` INT NOT NULL COMMENT '变化量（负数为扣分，正数为恢复）',
+    `before_score` INT NOT NULL COMMENT '变化前分数',
+    `after_score` INT NOT NULL COMMENT '变化后分数',
+    `type` TINYINT NOT NULL COMMENT '类型：1-违规扣分，2-支付恢复，3-自然恢复，4-管理员调整',
+    `reason` VARCHAR(255) DEFAULT NULL COMMENT '原因描述',
+    `related_order_id` VARCHAR(32) DEFAULT NULL COMMENT '关联订单ID',
+    `related_task_id` VARCHAR(32) DEFAULT NULL COMMENT '关联任务ID',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='信誉分变动记录表';
+
+-- 申诉表
+CREATE TABLE `appeal` (
+    `id` VARCHAR(32) NOT NULL,
+    `order_id` VARCHAR(32) NOT NULL COMMENT '关联订单ID',
+    `task_id` VARCHAR(32) DEFAULT NULL COMMENT '关联任务ID',
+    `applicant_id` VARCHAR(32) NOT NULL COMMENT '申诉人ID',
+    `respondent_id` VARCHAR(32) NOT NULL COMMENT '被申诉方ID',
+    `appeal_type` TINYINT NOT NULL COMMENT '1-拒不支付，2-虚假送达，3-恶意退款，4-物品损坏，5-虚假确认',
+    `status` TINYINT DEFAULT 0 COMMENT '0-待审核，1-已受理，2-已驳回',
+    `compensation_amount` DECIMAL(10,2) DEFAULT NULL COMMENT '赔付金额',
+    `evidence` VARCHAR(500) DEFAULT NULL COMMENT '申诉描述/证据',
+    `admin_id` VARCHAR(32) DEFAULT NULL COMMENT '审核管理员ID',
+    `audit_remark` VARCHAR(255) DEFAULT NULL COMMENT '审核意见',
+    `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    KEY `idx_order_id` (`order_id`),
+    KEY `idx_applicant_id` (`applicant_id`),
+    KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='申诉表';
+
+-- 赔偿金池表
+CREATE TABLE `compensation_pool` (
+    `id` VARCHAR(32) NOT NULL,
+    `balance` DECIMAL(12,2) DEFAULT 0.00 COMMENT '金池余额',
+    `total_income` DECIMAL(12,2) DEFAULT 0.00 COMMENT '总收入',
+    `total_expense` DECIMAL(12,2) DEFAULT 0.00 COMMENT '总支出',
+    `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='赔偿金池表';
+
 -- 初始化系统配置（智能匹配算法权重）
 INSERT INTO `sys_config` (`id`, `config_key`, `config_value`, `description`) VALUES
 ('1', 'match.weight.distance', '0.4', '距离权重'),
 ('2', 'match.weight.credit', '0.3', '信用积分权重'),
 ('3', 'match.weight.reward', '0.2', '酬金权重'),
 ('4', 'match.weight.completion', '0.1', '完成率权重');
+
+-- 初始化赔偿金池
+INSERT INTO `compensation_pool` (`id`, `balance`, `total_income`, `total_expense`) VALUES
+('1', 0.00, 0.00, 0.00);

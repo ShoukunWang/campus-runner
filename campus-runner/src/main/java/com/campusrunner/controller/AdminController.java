@@ -2,6 +2,7 @@ package com.campusrunner.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.campusrunner.entity.Admin;
+import com.campusrunner.entity.Appeal;
 import com.campusrunner.entity.Task;
 import com.campusrunner.entity.User;
 import com.campusrunner.service.AdminService;
@@ -276,5 +277,63 @@ public class AdminController {
         } catch (RuntimeException e) {
             return Result.error(4007, e.getMessage());
         }
+    }
+
+    // ==================== 申诉管理 ====================
+
+    @GetMapping("/appeal/list")
+    public Result<Page<Appeal>> getAppealList(
+            @RequestParam(defaultValue = "1") Integer pageNum,
+            @RequestParam(defaultValue = "10") Integer pageSize,
+            @RequestParam(required = false) Integer status,
+            HttpServletRequest request) {
+
+        String userType = (String) request.getAttribute("userType");
+        if (!"ADMIN".equals(userType)) {
+            return Result.error(403, "无权访问");
+        }
+
+        Page<Appeal> page = adminService.getAppealList(pageNum, pageSize, status);
+        return Result.success(page);
+    }
+
+    @PostMapping("/appeal/{id}/audit")
+    public Result<Appeal> auditAppeal(
+            @PathVariable String id,
+            @RequestBody Map<String, Object> params,
+            HttpServletRequest request) {
+
+        String userType = (String) request.getAttribute("userType");
+        if (!"ADMIN".equals(userType)) {
+            return Result.error(403, "无权访问");
+        }
+
+        try {
+            Integer status = (Integer) params.get("status");
+            String remark = (String) params.get("remark");
+            String adminId = (String) request.getAttribute("userId");
+
+            if (status == null) {
+                return Result.error(400, "审核状态不能为空");
+            }
+
+            Appeal appeal = adminService.auditAppeal(id, adminId, status, remark);
+            return Result.success("审核完成", appeal);
+        } catch (RuntimeException e) {
+            return Result.error(4008, e.getMessage());
+        }
+    }
+
+    // ==================== 赔偿金池 ====================
+
+    @GetMapping("/credit-pool")
+    public Result<Map<String, Object>> getCompensationPool(HttpServletRequest request) {
+        String userType = (String) request.getAttribute("userType");
+        if (!"ADMIN".equals(userType)) {
+            return Result.error(403, "无权访问");
+        }
+
+        Map<String, Object> pool = adminService.getCompensationPool();
+        return Result.success(pool);
     }
 }

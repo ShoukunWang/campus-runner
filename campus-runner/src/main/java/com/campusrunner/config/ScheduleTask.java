@@ -7,6 +7,7 @@ import com.campusrunner.entity.User;
 import com.campusrunner.mapper.OrderMapper;
 import com.campusrunner.mapper.TaskMapper;
 import com.campusrunner.mapper.UserMapper;
+import com.campusrunner.service.CreditService;
 import com.campusrunner.service.OrderService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -32,6 +33,9 @@ public class ScheduleTask {
 
     @Autowired
     private OrderService orderService;
+
+    @Autowired
+    private CreditService creditService;
 
     /**
      * 每天凌晨1点执行：自动确认超过3天未确认的任务
@@ -127,16 +131,13 @@ public class ScheduleTask {
                 order.setUpdateTime(LocalDateTime.now());
                 orderMapper.updateById(order);
                 
-                // 2. 扣除发布者信用积分（每次扣5分）
-                User publisher = userMapper.selectById(order.getPublisherId());
-                if (publisher != null) {
-                    int oldScore = publisher.getCreditScore();
-                    int newScore = Math.max(0, oldScore - 5); // 最低0分
-                    publisher.setCreditScore(newScore);
-                    userMapper.updateById(publisher);
-                    System.out.println("[定时任务] 发布者ID=" + publisher.getId() + 
-                                     " 信用积分: " + oldScore + " → " + newScore +
-                                     " 原因: 订单ID=" + order.getId() + " 支付逾期");
+                // 2. 扣除发布者信用积分（每次扣15分，对应PAYMENT_OVERDUE类型）
+                try {
+                    int newScore = creditService.deductScore(order.getPublisherId(), 15, "拒不支付", order.getId(), order.getTaskId());
+                    System.out.println("[定时任务] 发布者ID=" + order.getPublisherId() + 
+                                     " 信用积分因订单ID=" + order.getId() + "支付逾期被扣15分，当前分数: " + newScore);
+                } catch (Exception e) {
+                    System.err.println("[定时任务] 发布者ID=" + order.getPublisherId() + " 信用积分扣除失败: " + e.getMessage());
                 }
                 
                 System.out.println("[定时任务] 订单ID=" + order.getId() + " 已标记为支付逾期");

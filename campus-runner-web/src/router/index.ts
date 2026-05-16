@@ -75,6 +75,18 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresAdmin: true, title: '管理员管理' }
     },
     {
+      path: '/admin/appeals',
+      name: 'admin-appeals',
+      component: () => import('@/views/AdminView.vue'),
+      meta: { requiresAuth: true, requiresAdmin: true, title: '申诉管理' }
+    },
+    {
+      path: '/credit-score',
+      name: 'creditScore',
+      component: () => import('@/views/CreditScoreView.vue'),
+      meta: { requiresAuth: true, title: '信誉分详情' }
+    },
+    {
       path: '/favorites',
       name: 'favorites',
       component: () => import('@/views/FavoritesView.vue'),

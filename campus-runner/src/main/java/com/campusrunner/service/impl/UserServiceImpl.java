@@ -6,6 +6,7 @@ import cn.hutool.crypto.digest.DigestUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.campusrunner.entity.User;
 import com.campusrunner.mapper.UserMapper;
+import com.campusrunner.service.CreditService;
 import com.campusrunner.service.UserService;
 import com.campusrunner.utils.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +22,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private CreditService creditService;
 
     @Override
     @Transactional
@@ -78,6 +82,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
         if (user.getStatus() == 0) {
             throw new RuntimeException("账号已被禁用");
+        }
+
+        if (creditService.isAccountFrozen(user.getCreditScore())) {
+            throw new RuntimeException("账号已冻结，请联系管理员恢复信誉分");
         }
 
         user.setLastLoginTime(LocalDateTime.now());

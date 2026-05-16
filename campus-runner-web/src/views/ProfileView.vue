@@ -31,6 +31,10 @@
             <el-icon><Wallet /></el-icon>
             <span>我的订单</span>
           </div>
+          <div class="menu-item" @click="$router.push('/credit-score')">
+            <el-icon><Coin /></el-icon>
+            <span>信誉分</span>
+          </div>
         </div>
 
         <div class="actions">
@@ -63,7 +67,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Document, Star, Wallet } from '@element-plus/icons-vue'
+import { Document, Star, Wallet, Coin } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { getUserInfo, updateUserInfo } from '@/api/user'
 import { getCurrentAdmin } from '@/api/admin'

@@ -23,6 +23,10 @@
           <el-icon><Setting /></el-icon>
           <span>管理员管理</span>
         </el-menu-item>
+        <el-menu-item index="/admin/appeals">
+          <el-icon><Warning /></el-icon>
+          <span>申诉管理</span>
+        </el-menu-item>
       </el-menu>
     </div>
 
@@ -389,6 +393,117 @@
           />
         </el-card>
       </div>
+
+      <!-- 申诉管理 -->
+      <div v-else-if="$route.path === '/admin/appeals'" class="appeals-management">
+        <el-row :gutter="20" class="mb-20">
+          <el-col :xs="24" :sm="12" :md="6">
+            <div class="stat-card pool-balance">
+              <div class="stat-icon">
+                <el-icon :size="32"><Money /></el-icon>
+              </div>
+              <div class="stat-content">
+                <div class="stat-value">¥{{ compensationPool.balance || 0 }}</div>
+                <div class="stat-label">赔偿金池余额</div>
+              </div>
+            </div>
+          </el-col>
+          <el-col :xs="24" :sm="12" :md="6">
+            <div class="stat-card pool-income">
+              <div class="stat-icon">
+                <el-icon :size="32"><Top /></el-icon>
+              </div>
+              <div class="stat-content">
+                <div class="stat-value">¥{{ compensationPool.totalIncome || 0 }}</div>
+                <div class="stat-label">累计收入</div>
+              </div>
+            </div>
+          </el-col>
+          <el-col :xs="24" :sm="12" :md="6">
+            <div class="stat-card pool-expense">
+              <div class="stat-icon">
+                <el-icon :size="32"><Bottom /></el-icon>
+              </div>
+              <div class="stat-content">
+                <div class="stat-value">¥{{ compensationPool.totalExpense || 0 }}</div>
+                <div class="stat-label">累计支出</div>
+              </div>
+            </div>
+          </el-col>
+        </el-row>
+
+        <el-card shadow="hover">
+          <template #header>
+            <span>申诉列表</span>
+          </template>
+          <div class="search-bar">
+            <el-form :inline="true" :model="appealSearchForm">
+              <el-form-item label="状态">
+                <el-select v-model="appealSearchForm.status" placeholder="全部" style="width: 120px" clearable>
+                  <el-option label="待审核" :value="0" />
+                  <el-option label="已受理" :value="1" />
+                  <el-option label="已驳回" :value="2" />
+                </el-select>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" @click="handleAppealSearch">
+                  <el-icon><Search /></el-icon>
+                  搜索
+                </el-button>
+                <el-button @click="handleAppealSearchReset">重置</el-button>
+              </el-form-item>
+            </el-form>
+          </div>
+          <el-table :data="appealList" style="width: 100%" v-loading="appealLoading">
+            <el-table-column prop="orderId" label="订单ID" width="180" />
+            <el-table-column prop="appealType" label="申诉类型" width="120">
+              <template #default="scope">
+                <el-tag size="small" :type="getAppealTypeTagType(scope.row.appealType)">
+                  {{ getAppealTypeText(scope.row.appealType) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="applicantId" label="申诉人ID" width="120" />
+            <el-table-column prop="respondentId" label="被申诉方ID" width="120" />
+            <el-table-column prop="status" label="状态" width="100" align="center">
+              <template #default="scope">
+                <el-tag size="small" :type="getAppealStatusTagType(scope.row.status)">
+                  {{ getAppealStatusText(scope.row.status) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="evidence" label="申诉说明" show-overflow-tooltip />
+            <el-table-column prop="createTime" label="申诉时间" width="180" />
+            <el-table-column label="操作" width="180" fixed="right" align="center">
+              <template #default="scope">
+                <el-button
+                  v-if="scope.row.status === 0"
+                  size="small"
+                  type="primary"
+                  @click="handleAuditAppeal(scope.row)"
+                >
+                  审核
+                </el-button>
+                <el-button
+                  v-else
+                  size="small"
+                  @click="handleViewAppeal(scope.row)"
+                >
+                  查看
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-pagination
+            v-model:current-page="appealPageNum"
+            v-model:page-size="appealPageSize"
+            :total="appealTotal"
+            layout="total, prev, pager, next, jumper"
+            @change="loadAppealList"
+            class="table-pagination"
+          />
+        </el-card>
+      </div>
     </div>
 
     <!-- 编辑用户弹窗 -->
@@ -487,7 +602,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 // 从 Element Plus 的图标库 @element-plus/icons-vue 中导入的图标组件
 import { 
   DataLine, User, List, Setting, Document, 
-  UserFilled, CircleCheck, Money, Plus, Search
+  UserFilled, CircleCheck, Money, Plus, Search, Warning, Top, Bottom
 } from '@element-plus/icons-vue'
 
 // 导入 API 函数
@@ -503,6 +618,11 @@ import {
   addAdmin,
   updateAdmin
 } from '@/api/admin'
+import {
+  getAdminAppealList,
+  auditAppeal,
+  getCompensationPool
+} from '@/api/appeal'
 
 const route = useRoute()
 
@@ -538,6 +658,143 @@ const adminPageSize = ref(10)
 const adminSearchForm = ref({
   keyword: ''
 })
+
+// 申诉管理
+const appealLoading = ref(false)
+const appealList = ref<any[]>([])
+const appealTotal = ref(0)
+const appealPageNum = ref(1)
+const appealPageSize = ref(10)
+const appealSearchForm = ref({
+  status: null as number | null
+})
+const compensationPool = ref({
+  balance: 0,
+  totalIncome: 0,
+  totalExpense: 0
+})
+
+const getAppealTypeText = (type: number) => {
+  const map: Record<number, string> = {
+    1: '拒不支付',
+    2: '虚假送达',
+    3: '恶意退款',
+    4: '物品损坏',
+    5: '虚假确认'
+  }
+  return map[type] || '未知'
+}
+
+const getAppealTypeTagType = (type: number) => {
+  const map: Record<number, string> = {
+    1: 'danger',
+    2: 'warning',
+    3: 'warning',
+    4: 'danger',
+    5: 'danger'
+  }
+  return map[type] || 'info'
+}
+
+const getAppealStatusText = (status: number) => {
+  const map: Record<number, string> = {
+    0: '待审核',
+    1: '已受理',
+    2: '已驳回'
+  }
+  return map[status] || '未知'
+}
+
+const getAppealStatusTagType = (status: number) => {
+  const map: Record<number, string> = {
+    0: 'warning',
+    1: 'success',
+    2: 'info'
+  }
+  return map[status] || 'info'
+}
+
+const loadAppealList = async () => {
+  appealLoading.value = true
+  try {
+    const res: any = await getAdminAppealList({
+      pageNum: appealPageNum.value,
+      pageSize: appealPageSize.value,
+      status: appealSearchForm.value.status ?? undefined
+    })
+    appealList.value = res.result.records || []
+    appealTotal.value = res.result.total || 0
+  } catch (error) {
+    console.error(error)
+  } finally {
+    appealLoading.value = false
+  }
+}
+
+const loadCompensationPool = async () => {
+  try {
+    const res: any = await getCompensationPool()
+    compensationPool.value = res.result || { balance: 0, totalIncome: 0, totalExpense: 0 }
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+const handleAppealSearch = () => {
+  appealPageNum.value = 1
+  loadAppealList()
+}
+
+const handleAppealSearchReset = () => {
+  appealSearchForm.value = { status: null }
+  appealPageNum.value = 1
+  loadAppealList()
+}
+
+const handleAuditAppeal = async (row: any) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要受理此申诉吗？被申诉方将扣除信誉分。`,
+      '受理申诉',
+      {
+        confirmButtonText: '受理',
+        cancelButtonText: '驳回',
+        type: 'warning'
+      }
+    )
+    await auditAppeal(row.id, { status: 1 })
+    ElMessage.success('已受理申诉')
+    loadAppealList()
+    loadCompensationPool()
+  } catch (error: any) {
+    if (error === 'cancel') {
+      try {
+        await ElMessageBox.confirm(
+          `确定要驳回此申诉吗？`,
+          '驳回申诉',
+          { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+        )
+        await auditAppeal(row.id, { status: 2 })
+        ElMessage.success('已驳回申诉')
+        loadAppealList()
+      } catch (e: any) {
+        if (e !== 'cancel') {
+          console.error(e)
+        }
+      }
+    } else {
+      console.error(error)
+    }
+  }
+}
+
+const handleViewAppeal = (row: any) => {
+  ElMessageBox.alert(
+    `申诉类型：${getAppealTypeText(row.appealType)}\n申诉说明：${row.evidence || '无'}\n申诉时间：${row.createTime}`,
+    '申诉详情',
+    { confirmButtonText: '关闭' }
+  )
+}
 
 // 弹窗
 const userDialogVisible = ref(false)
@@ -901,6 +1158,9 @@ watch(
       loadTaskList()
     } else if (newPath === '/admin/admins') {
       loadAdminList()
+    } else if (newPath === '/admin/appeals') {
+      loadAppealList()
+      loadCompensationPool()
     }
   },
   { immediate: true }
