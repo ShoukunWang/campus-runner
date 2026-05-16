@@ -27,9 +27,9 @@
             <el-icon><Star /></el-icon>
             <span>我的收藏</span>
           </div>
-          <div class="menu-item" @click="$router.push('/payments')">
+          <div class="menu-item" @click="$router.push('/orders')">
             <el-icon><Wallet /></el-icon>
-            <span>支付记录</span>
+            <span>我的订单</span>
           </div>
         </div>
 
