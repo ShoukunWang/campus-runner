@@ -43,23 +43,23 @@
         <h4>恢复信誉分</h4>
         <div class="price-table">
           <div class="price-row header">
-            <span>目标分数</span>
-            <span>单价</span>
-            <span>费用</span>
-            <span>操作</span>
+            <div>目标分数</div>
+            <div>费用</div>
+            <div class="action-cell">操作</div>
           </div>
-          <div v-for="target in restoreTargets" :key="target.score" class="price-row">
-            <span>{{ creditScore }} → {{ target.score }}</span>
-            <span>¥{{ target.price }}/分</span>
-            <span class="amount">¥{{ calculateTotalPrice(target.score, target.price) }}</span>
-            <el-button
-              type="primary"
-              size="small"
-              :disabled="isRestoring"
-              @click="handleRestore(target.score)"
-            >
-              恢复
-            </el-button>
+          <div v-for="target in availableTargets" :key="target.score" class="price-row">
+            <div>{{ creditScore }} → {{ target.score }}</div>
+            <div><span class="amount">¥{{ target.price }}</span></div>
+            <div class="action-cell">
+              <el-button
+                type="primary"
+                size="small"
+                :disabled="isRestoring"
+                @click="handleRestore(target.score)"
+              >
+                恢复
+              </el-button>
+            </div>
           </div>
         </div>
       </div>
@@ -153,12 +153,17 @@ const restoreDialogVisible = ref(false)
 const targetScore = ref(100)
 const restorePrice = ref(0)
 
-const restoreTargets = [
-  { score: 60, price: 0.5 },
-  { score: 80, price: 2 },
-  { score: 90, price: 5 },
-  { score: 100, price: 10 }
-]
+const restoreTargets = [80, 90, 100]
+const restorePrices = ref<Record<number, string>>({})
+
+const availableTargets = computed(() => {
+  return restoreTargets
+    .filter(score => score > creditScore.value)
+    .map(score => ({
+      score,
+      price: restorePrices.value[score] || '计算中...'
+    }))
+})
 
 const scoreClass = computed(() => {
   if (creditScore.value >= 80) return 'score-high'
@@ -207,12 +212,6 @@ const formatDateTime = (dateTime: string) => {
   return new Date(dateTime).toLocaleString('zh-CN')
 }
 
-const calculateTotalPrice = (target: number, unitPrice: number) => {
-  const diff = target - creditScore.value
-  if (diff <= 0) return 0
-  return (diff * unitPrice).toFixed(2)
-}
-
 const loadCreditScore = async () => {
   loading.value = true
   try {
@@ -221,10 +220,25 @@ const loadCreditScore = async () => {
     canPublish.value = res.result.canPublish
     canAccept.value = res.result.canAccept
     isFrozen.value = res.result.isFrozen
+    
+    await loadRestorePrices()
   } catch (error) {
     console.error(error)
   } finally {
     loading.value = false
+  }
+}
+
+const loadRestorePrices = async () => {
+  for (const target of restoreTargets) {
+    if (target > creditScore.value) {
+      try {
+        const res: any = await getRestorePrice(target)
+        restorePrices.value[target] = res.result.price
+      } catch (error) {
+        console.error(`Failed to get price for ${target}:`, error)
+      }
+    }
   }
 }
 
@@ -247,29 +261,32 @@ const handleRefresh = () => {
 }
 
 const handleRestore = async (target: number) => {
-  targetScore.value = target
   try {
     const res: any = await getRestorePrice(target)
+    targetScore.value = target
     restorePrice.value = res.result.price
     restoreDialogVisible.value = true
-  } catch (error: any) {
-    ElMessage.error(error.message || '获取价格失败')
+  } catch (error) {
+    ElMessage.error('获取价格失败')
   }
 }
 
 const confirmRestore = async () => {
   isRestoring.value = true
   try {
-    await restoreCredit({
-      targetScore: targetScore.value,
-      paidAmount: restorePrice.value
-    })
-    ElMessage.success('信誉分恢复成功')
+    await restoreCredit({ targetScore: targetScore.value, paidAmount: parseFloat(restorePrice.value) })
+    ElMessage.success('恢复成功')
     restoreDialogVisible.value = false
+    
+    creditScore.value = targetScore.value
+    if (userStore.userInfo) {
+      userStore.userInfo.creditScore = targetScore.value
+    }
+    
     loadCreditScore()
     loadRecords()
-  } catch (error: any) {
-    ElMessage.error(error.message || '恢复失败')
+  } catch (error) {
+    ElMessage.error('恢复失败')
   } finally {
     isRestoring.value = false
   }
@@ -281,10 +298,15 @@ onMounted(() => {
 })
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 .credit-container {
-  max-width: 900px;
+  max-width: 800px;
   margin: 0 auto;
+  padding: 20px;
+}
+
+.credit-card {
+  margin-bottom: 20px;
 }
 
 .card-header {
@@ -296,120 +318,165 @@ onMounted(() => {
 .credit-score-section {
   display: flex;
   align-items: center;
-  gap: 40px;
-  padding: 20px 0;
+  gap: 60px;
+  margin-bottom: 30px;
 }
 
 .score-display {
-  .score-circle {
-    width: 140px;
-    height: 140px;
-    border-radius: 50%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    border: 6px solid;
+  flex-shrink: 0;
+}
 
-    &.score-high {
-      border-color: #67c23a;
-      background-color: rgba(103, 194, 58, 0.1);
-      .score-value { color: #67c23a; }
-    }
-    &.score-medium {
-      border-color: #e6a23c;
-      background-color: rgba(230, 162, 60, 0.1);
-      .score-value { color: #e6a23c; }
-    }
-    &.score-low {
-      border-color: #f56c6c;
-      background-color: rgba(245, 108, 108, 0.1);
-      .score-value { color: #f56c6c; }
-    }
-    &.score-critical {
-      border-color: #909399;
-      background-color: rgba(144, 147, 153, 0.1);
-      .score-value { color: #909399; }
-    }
+.score-circle {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  font-weight: bold;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
 
-    .score-value {
-      font-size: 36px;
-      font-weight: 600;
-    }
-    .score-label {
-      font-size: 14px;
-      color: #909399;
-    }
-  }
+.score-high {
+  background: linear-gradient(135deg, #67c23a, #85ce61);
+}
+
+.score-medium {
+  background: linear-gradient(135deg, #e6a23c, #f0c78a);
+}
+
+.score-low {
+  background: linear-gradient(135deg, #f56c6c, #f89898);
+}
+
+.score-critical {
+  background: linear-gradient(135deg, #409eff, #73b4ff);
+}
+
+.score-value {
+  font-size: 48px;
+  color: #fff;
+}
+
+.score-label {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .score-info {
   flex: 1;
-  .info-item {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 16px;
-
-    .label {
-      width: 100px;
-      color: #606266;
-    }
-  }
 }
 
-.restore-section, .records-section {
-  h4 {
-    margin: 16px 0;
-    font-size: 16px;
-    color: #303133;
-  }
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.info-item .label {
+  width: 100px;
+  color: #666;
+}
+
+.restore-section {
+  margin-top: 30px;
+}
+
+.restore-section h4 {
+  margin-bottom: 16px;
+  font-size: 16px;
 }
 
 .price-table {
-  background-color: #f5f7fa;
+  border: 1px solid #ebeef5;
   border-radius: 8px;
-  padding: 12px 16px;
+  overflow: hidden;
+  width: 100%;
+}
 
-  .price-row {
-    display: grid;
-    grid-template-columns: 1.5fr 1fr 1fr 100px;
-    gap: 16px;
-    padding: 12px 0;
-    align-items: center;
+.price-row {
+  display: flex;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #ebeef5;
+}
 
-    &.header {
-      font-weight: 600;
-      color: #606266;
-      border-bottom: 1px solid #ebeef5;
-    }
+.price-row:last-child {
+  border-bottom: none;
+}
 
-    &:not(.header) {
-      border-bottom: 1px solid #ebeef5;
-      &:last-child { border-bottom: none; }
-    }
+.price-row.header {
+  background: #f5f7fa;
+  font-weight: bold;
+  color: #666;
+}
 
-    .amount {
-      color: #f56c6c;
-      font-weight: 600;
-    }
-  }
+.price-row > div:nth-child(1) {
+  width: 35%;
+  padding-left: 16px;
+}
+
+.price-row > div:nth-child(2) {
+  width: 35%;
+  text-align: center;
+}
+
+.price-row > div:nth-child(3) {
+  width: 30%;
+  padding-right: 16px;
+}
+
+.price-row .action-cell {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.price-row .action-cell .el-button {
+  width: 60px;
+  margin: 0;
+}
+
+.price-row span.amount {
+  color: #f56c6c;
+  font-weight: bold;
+}
+
+.records-section {
+  margin-top: 20px;
+}
+
+.records-section h4 {
+  margin-bottom: 16px;
+  font-size: 16px;
 }
 
 .table-pagination {
+  text-align: right;
   margin-top: 16px;
-  display: flex;
-  justify-content: flex-end;
 }
 
-.positive { color: #67c23a; font-weight: 600; }
-.negative { color: #f56c6c; font-weight: 600; }
+.positive {
+  color: #67c23a;
+}
 
-.restore-dialog-content {
-  p {
-    margin: 8px 0;
-    font-size: 16px;
-    .amount { color: #f56c6c; font-size: 20px; }
-  }
+.negative {
+  color: #f56c6c;
+}
+
+.restore-dialog-content p {
+  margin-bottom: 12px;
+}
+
+.restore-dialog-content .price {
+  font-size: 18px;
+  margin-top: 16px;
+}
+
+.restore-dialog-content .amount {
+  color: #f56c6c;
+  font-size: 24px;
 }
 </style>

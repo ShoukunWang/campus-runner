@@ -219,10 +219,11 @@ public class CreditServiceImpl implements CreditService {
             }
         }
 
-        if (currentScore >= 80 && targetScore > currentScore) {
+        if (targetScore > 80) {
+            int lower = Math.max(currentScore, 80);
             int upper = Math.min(targetScore, 100);
-            if (currentScore <= upper) {
-                totalPrice = totalPrice.add(BigDecimal.valueOf(upper - currentScore + 1).multiply(new BigDecimal("0.5")));
+            if (lower <= upper) {
+                totalPrice = totalPrice.add(BigDecimal.valueOf(upper - lower + 1).multiply(new BigDecimal("0.5")));
             }
         }
 
